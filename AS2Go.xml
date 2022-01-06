@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- c:\temp\AStGo -->
+<Config>
+  <Script>
+    <add key="Name" value="AS2Go v2.0" />
+    <add key="Author" value="hozimmer@microsoft.com" />
+  </Script>
+  <DefaultParameter>
+    <!-- Use Case -->
+    <add key="UseCase" value="Attack scenario to GO" />
+    <add key="DemoTitle" value="Attack scenario to GO - along the kill-chain" />
+    <!-- Domain Settings -->
+    <add key="mydc" value="NUC-DC01" />
+    <add key="myAppServer" value="ADMIN-PC" />
+    <add key="myViPC" value="NUC-VICTIMPC" />
+    <add key="mySAW" value="ADMIN-PC" />
+    <add key="fqdn" value="sandbox.corp" />
+    <add key="DomainSID" value="S-1-5-21-3234120428-3402829332-2157831702" />
+    <add key="pthntml" value="3b63d440709ce7649f2279aa89ade67a" />
+    <add key="krbtgtntml" value="fd568aa1bc5bd2d8091905c10335c4d8" />
+    <add key="BDUsersOU" value="OU=Users,OU=AS2Go,DC=sandbox,DC=corp" />
+    <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp" />
+    <add key="OfflineDITFile" value="\\NUC-DC01\C$\TEMP\AS2GO" />
+    <add key="globalHelpDesk" value="sg-as2go-helpdesk" />
+    <add key="Honeytoken" value="HZ-Root-Admin@sandbox.corp" />
+    <!-- Parameter -->
+    <add key="ticketsDir" value="C:\temp\tickets" />
+    <add key="ticketsPath" value="c$\temp\tickets" />
+    <add key="time2reboot" value="99" />
+    <add key="ImageViewer" value="C:\Program Files (x86)\Internet Explorer\iexplore.exe" />
+    <!-- Spare part -->
+    <add key="SP01" value="xxx" />
+    <add key="SP02" value="xxx" />
+    <add key="SP03" value="xxx" />
+    <add key="SP04" value="xxx" />
+    <!-- no need for modification -->
+    <add key="LastStart" value="2022-01-05 15:59:44" />
+    <add key="LastFinished" value="2022-01-05 15:55:26" />
+    <add key="LastDuration" value="00:13:18 [h]" />
+    <add key="LastVictim" value="VI-20220104" />
+    <add key="LastBDUser" value="BD-20220105.155326" />
+    <add key="LastStage" value="COMPLETE" />
+  </DefaultParameter>
+</Config>
