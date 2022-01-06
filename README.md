@@ -1,6 +1,6 @@
 # AS2GO-Prepare-Victim-PC
 Files to prepare the AS2GO | Victim PC
-Find more information here in my blog post [AS2Go | Lab Setup | Admin PC](https://herrhozi.com/2022/01/05/as2go-lab-setup-admin-pc/). 
+Find more information here in my blog post [AS2Go | Lab Setup | Admin PC](https://herrhozi.com/2022/01/06/as2go-lab-setup-victim-pc/). 
 
 Download the zip file and extract them to c:\Temp\AS2Go
 
