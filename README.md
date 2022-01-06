@@ -4,15 +4,19 @@ Find more information here in my blog post [AS2Go | Lab Setup | Admin PC](https:
 
 ## More Tools needed
 
+
 Warning
+  ```sh
+  The following tools are presented for research purposes only. 
+  I cannot and does not guarantee or warranty their behavior. 
+  They are subject to change without notice. 
+  These tools should be run in a test lab environment only.
+  ```
 
-The following tools are presented for research purposes only. I cannot and does not guarantee or warranty their behavior. They are subject to change without notice. These tools should be run in a test lab environment only.
 
-
-
-- [latest Mimikatz Release](https://github.com/gentilkiwi/mimikatz/releases/)
-- [latest Netsees Release](https://www.joeware.net/freetools/tools/netsess/)
-- [latest Psexec Release](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec/)
+- [latest release of Mimikatz.exe](https://github.com/gentilkiwi/mimikatz/releases/)
+- [latest release of NetSees.exe](https://www.joeware.net/freetools/tools/netsess/)
+- [latest release of Psexec.exe](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec/)
 
 
 
