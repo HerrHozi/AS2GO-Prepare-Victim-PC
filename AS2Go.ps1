@@ -2141,12 +2141,12 @@ If ($answer -eq $yes)
     Write-Host "____________________________________________________________________`n"     
     
     $question = "`nDo you want to run this step - Y or N? Default "
-    $answer   = Get-Answer -question $question -defaultValue $Yes
+    $answer   = Get-Answer -question $question -defaultValue $no
 
     If ($answer -eq $yes)
     {
         #run functions
-      SimulateRansomare -Computer $mySAW
+      #SimulateRansomare -Computer $mySAW
     }
 
 
