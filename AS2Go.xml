@@ -2,7 +2,7 @@
 <!-- c:\temp\AS2Go -->
 <Config>
   <Script>
-    <add key="Name" value="AS2Go v2.0" />
+    <add key="Name" value="AS2Go v2.01.000" />
     <add key="Author" value="hozimmer@microsoft.com" />
   </Script>
   <DefaultParameter>
