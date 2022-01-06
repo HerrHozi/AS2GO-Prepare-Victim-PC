@@ -1,5 +1,5 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<!-- c:\temp\AStGo -->
+<?xml version="1.0" encoding="utf-8"?>
+<!-- c:\temp\AS2Go -->
 <Config>
   <Script>
     <add key="Name" value="AS2Go v2.0" />
@@ -9,23 +9,27 @@
     <!-- Use Case -->
     <add key="UseCase" value="Attack scenario to GO" />
     <add key="DemoTitle" value="Attack scenario to GO - along the kill-chain" />
-    <!-- Domain Settings -->
-    <add key="mydc" value="NUC-DC01" />
-    <add key="myAppServer" value="ADMIN-PC" />
-    <add key="myViPC" value="NUC-VICTIMPC" />
-    <add key="mySAW" value="ADMIN-PC" />
-    <add key="fqdn" value="sandbox.corp" />
-    <add key="DomainSID" value="S-1-5-21-3234120428-3402829332-2157831702" />
-    <add key="pthntml" value="3b63d440709ce7649f2279aa89ade67a" />
-    <add key="krbtgtntml" value="fd568aa1bc5bd2d8091905c10335c4d8" />
+    <!-- Domain Settings - automatically filled -->
+    <add key="mydc" value="[automatically filled]" />
+    <add key="myViPC" value="[automatically filled]" />
+    <add key="mySAW" value="[AdminPC]" />
+    <add key="fqdn" value="[automatically filled]" />
+    <add key="DomainSID" value="[automatically filled]" />
+	<!-- Domain Settings - Changes are required -->
+	<add key="myAppServer" value="[DC or AdminPC]" />
     <add key="BDUsersOU" value="OU=Users,OU=AS2Go,DC=sandbox,DC=corp" />
     <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp" />
-    <add key="OfflineDITFile" value="\\NUC-DC01\C$\TEMP\AS2GO" />
-    <add key="globalHelpDesk" value="sg-as2go-helpdesk" />
+    <add key="OfflineDITFile" value="\\DC01\AD-Backup" />
+    <add key="globalHelpDesk" value="SG-AS2Go-Helpdesk" />
+	<!-- Needed for Latermovement & Golden Ticket - Changes are required -->
+    <add key="pthntml" value="[value can set during the attack]" />
+    <add key="krbtgtntml" value="[value can set during the attack]" />
+	<!-- MDI Settings - Changes are required -->
     <add key="Honeytoken" value="HZ-Root-Admin@sandbox.corp" />
-    <!-- Parameter -->
+	<!-- do NOT change these parameter needed for PtT -->
     <add key="ticketsDir" value="C:\temp\tickets" />
     <add key="ticketsPath" value="c$\temp\tickets" />
+    <!-- Parameter -->
     <add key="time2reboot" value="99" />
     <add key="ImageViewer" value="C:\Program Files (x86)\Internet Explorer\iexplore.exe" />
     <!-- Spare part -->
