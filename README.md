@@ -4,7 +4,6 @@ Find more information here in my blog post [AS2Go | Lab Setup | Victim PC](https
 
 Download the zip file and extract them to c:\Temp\AS2Go
 
-https://github.com/kumu/docs/blob/master/faq/how-do-i-convert-a-project-from-private-to-public.md
 
 ## More Tools needed
 
