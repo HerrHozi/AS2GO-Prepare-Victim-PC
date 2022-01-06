@@ -64,9 +64,9 @@ $PrivledgeAccount = $no
 
 $stage00 = "COMPROMISED User Account"
 $stage10 = "RECONNAISSANCE"
-$stage20 = "Lateral Movement"
+$stage20 = "LATERAL MOVEMENT"
 $stage30 = "ACCESS SENSITIVE DATA"
-$stage40 = "DATA DOMAIN COMPROMISED"
+$stage40 = "DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
 
 $global:FGCHeader     = "YELLOW"
