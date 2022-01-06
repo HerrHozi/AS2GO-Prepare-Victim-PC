@@ -2,6 +2,21 @@
 Files to prepare the AS2GO | Victim PC
 Find more information here in my blog post [AS2Go | Lab Setup | Admin PC](https://herrhozi.com/2022/01/05/as2go-lab-setup-admin-pc/). 
 
+## More Tools needed
+
+Warning
+
+The following tools are presented for research purposes only. I cannot and does not guarantee or warranty their behavior. They are subject to change without notice. These tools should be run in a test lab environment only.
+
+
+
+- [latest Mimikatz Release](https://github.com/gentilkiwi/mimikatz/releases/)
+- [latest Netsees Release](https://www.joeware.net/freetools/tools/netsess/)
+- [latest Psexec Release](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec/)
+
+
+
+
 ## Quick Start Guide
 Open a Admin PowerShell terminal. The following command simulate some domain activities creates valid tickets.
 ```PowerShell
