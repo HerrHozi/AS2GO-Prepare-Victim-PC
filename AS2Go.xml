@@ -2,7 +2,7 @@
 <!-- c:\temp\AS2Go -->
 <Config>
   <Script>
-    <add key="Name" value="AS2Go v2.01.000" />
+    <add key="Name" value="AS2Go v2.01" />
     <add key="Author" value="hozimmer@microsoft.com" />
   </Script>
   <DefaultParameter>
@@ -10,30 +10,30 @@
     <add key="UseCase" value="Attack scenario to GO" />
     <add key="DemoTitle" value="Attack scenario to GO - along the kill-chain" />
     <!-- Domain Settings - automatically filled -->
-    <add key="mydc" value="[automatically filled]" />
-    <add key="myViPC" value="[automatically filled]" />
-    <add key="mySAW" value="[AdminPC]" />
-    <add key="fqdn" value="[automatically filled]" />
-    <add key="DomainSID" value="[automatically filled]" />
+    <add key="mydc" value="[filled automatically]" />
+    <add key="myViPC" value="[filled automatically]" />
+    <add key="fqdn" value="[filled automatically]" />
+    <add key="DomainSID" value="[filled automatically]" />
 	<!-- Domain Settings - Changes are required -->
-	<add key="myAppServer" value="[DC or AdminPC]" />
+	<add key="mySAW" value="[your AdminPC]" />
+	<add key="myAppServer" value="[your DC or AdminPC]" />
     <add key="BDUsersOU" value="OU=Users,OU=AS2Go,DC=sandbox,DC=corp" />
     <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp" />
     <add key="OfflineDITFile" value="\\DC01\AD-Backup" />
     <add key="globalHelpDesk" value="SG-AS2Go-Helpdesk" />
-	<!-- Needed for Latermovement & Golden Ticket - Changes are required -->
-    <add key="pthntml" value="[value can set during the attack]" />
-    <add key="krbtgtntml" value="[value can set during the attack]" />
+	<!-- Needed for Lateral Movement & Golden Ticket - Changes are required -->
+    <add key="pthntml" value="[value can be set during the attack]" />
+    <add key="krbtgtntml" value="[value can be set during the attack]" />
 	<!-- MDI Settings - Changes are required -->
     <add key="Honeytoken" value="HZ-Root-Admin@sandbox.corp" />
-	<!-- do NOT change these parameter needed for PtT -->
+	<!-- Do NOT change these parameter needed for PtT -->
     <add key="ticketsDir" value="C:\temp\tickets" />
     <add key="ticketsPath" value="c$\temp\tickets" />
     <!-- Parameter -->
     <add key="time2reboot" value="99" />
-    <add key="ImageViewer" value="C:\Program Files (x86)\Internet Explorer\iexplore.exe" />
     <!-- Spare part -->
-    <add key="SP01" value="xxx" />
+    <add key="ImageViewer" value="xxx" />
+	<add key="SP01" value="xxx" />
     <add key="SP02" value="xxx" />
     <add key="SP03" value="xxx" />
     <add key="SP04" value="xxx" />
@@ -41,7 +41,7 @@
     <add key="LastStart" value="2022-01-05 15:59:44" />
     <add key="LastFinished" value="2022-01-05 15:55:26" />
     <add key="LastDuration" value="00:13:18 [h]" />
-    <add key="LastVictim" value="VI-20220104" />
+    <add key="LastVictim" value="VI-HerrHoZi" />
     <add key="LastBDUser" value="BD-20220105.155326" />
     <add key="LastStage" value="COMPLETE" />
   </DefaultParameter>
