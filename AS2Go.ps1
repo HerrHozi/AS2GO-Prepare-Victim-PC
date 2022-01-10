@@ -16,7 +16,7 @@ The purpose of this script is to illustrate Defender for Identity's capabilities
 
 .NOTES
 
-last update: 2022-01-05
+last update: 2022-01-10
 File Name  : AS2Go.ps1 | Version 2.xx
 Author     : Holger Zimmermann | hozimmer@microsoft.com
 
@@ -44,14 +44,14 @@ https://docs.microsoft.com/en-us/defender-for-identity/playbook-lab-overview
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-05"
-$version      = "2.01.000" 
+$lastupdate   = "2022-01-10"
+$version      = "2.02.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
 $configFile   = "$path\AS2Go.xml"
 $tmp          = "$path\AS2Go.tmp"
-$exfiltration = "$path\exfiltration"
+$exfiltration = "$path\Exfiltration"
 
 $exit = "x"
 $yes  = "Y"
@@ -64,9 +64,9 @@ $PrivledgeAccount = $no
 
 $stage00 = "COMPROMISED User Account"
 $stage10 = "RECONNAISSANCE"
-$stage20 = "LATERAL MOVEMENT"
+$stage20 = "Lateral Movement"
 $stage30 = "ACCESS SENSITIVE DATA"
-$stage40 = "DOMAIN COMPROMISED"
+$stage40 = "DATA DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
 
 $global:FGCHeader     = "YELLOW"
@@ -195,8 +195,21 @@ Write-Log -Message "### Start Function $myfunction ###"
         #define the user first & last name
         $sPrefix = Get-Date -Format HHmmss    # create the first name based on hours, minutes and sec
         $sSuffix = Get-Date -Format yyyyMMdd   # create the last name based on year, month, days
-        $sFakeUser = "FU-$sSuffix.$sPrefix"
-        $sFakeUser = $env:USERNAME
+        #$sFakeUser = "FU-$sSuffix.$sPrefix"
+
+
+        If ($global:BDUser)
+           {
+           $sFakeUser = $global:BDUser
+           }
+        else
+           {
+           $sFakeUser = $env:USERNAME
+           #$sFakeUser = "Administrator"
+           }
+
+
+
 
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
@@ -303,7 +316,7 @@ Write-Log -Message "### Start Function $myfunction ###"
         {
         # only for Windows 10 machines
         #https://www.windowscentral.com/how-remote-shutdown-computer-windows-10
-        $Win10Maschine = "mtp-pc10"
+        $Win10Maschine = "$mySAW"
         net use \\$Win10Maschine\ipc$
         shutdown /r /f /c $commment /t $time2reboot /m \\$Win10Maschine
         }
@@ -1213,15 +1226,15 @@ Write-Host "____________________________________________________________________
 
 
 Write-Host "`n`nplease run the following commands from the new DOS Windows:`n" -ForegroundColor $global:FGCQuestion
-Write-Host "cd C:\<location>\AS2Go" -ForegroundColor $global:FGCCommand
-Write-Host "powershell.exe -file .\AS2Go.ps1" -ForegroundColor $global:FGCCommand
+Write-Host "00.cmd" -ForegroundColor $global:FGCCommand
+
 
 
 
 Set-KeyValue -key "LastStage" -NewValue $stage20
 
-Stop-Process -Name iexplore -Force
-
+Stop-Process -ErrorAction SilentlyContinue -Name iexplore -Force 
+Stop-Process -ErrorAction SilentlyContinue -Name msedge -Force 
 
 
 #####
@@ -2053,9 +2066,9 @@ Write-Host "          Attack Level - DOMAIN COMPROMISED AND PERSISTENCE         
 Write-Host "                                                                    "
 Write-Host "            #1 - create back door user                              "
 Write-Host "            #2 - export DPAPI master key                            "
-Write-Host "            #3 - create golden ticket                               "
-Write-Host "            #4 - PW reset and disable users                         "
-Write-Host "            #5 - Encrypt files                          "
+Write-Host "            #3 - PW reset and disable users                         "
+Write-Host "            #4 - Encrypt files                                      "
+Write-Host "            #5 - create golden ticket                               "
 Write-Host "            #6 - reboot (all machines)                              "  
 Write-Host "____________________________________________________________________`n" 
 
@@ -2101,6 +2114,40 @@ If ($answer -eq $yes)
         Pause
     }
      
+ 
+     Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "            User Manipulation - Disable & PW reset                   "
+    Write-Host "____________________________________________________________________`n" 
+  
+    Write-host "Your NEW backdoor user $global:BDUser use will be ignored :-)" -ForegroundColor $global:FGCHighLight    
+        
+    $question = "`nDo you want to run these steps - Y or N? Default "
+    $answer   = Get-Answer -question $question -defaultValue $Yes
+
+    If ($answer -eq $yes)
+    {
+        $MySearchBase = Get-KeyValue -key "MySearchBase"
+        Start-UserManipulation -SearchBase $MySearchBase
+    } 
+
+
+    Pause
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "                 ran ransomware attack?                               "
+    Write-Host "____________________________________________________________________`n"     
+    
+    $question = "`nDo you want to run this step - Y or N? Default "
+    $answer   = Get-Answer -question $question -defaultValue $Yes
+
+    If ($answer -eq $yes)
+    {
+        #run functions
+        # SimulateRansomare -Computer $mySAW
+    }
+ 
+    
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        create golden ticket for an unknown user                    "
@@ -2116,43 +2163,6 @@ If ($answer -eq $yes)
         CreateGoldenTicket
     } 
     
-
-    Clear-Host
-    Write-Host "____________________________________________________________________`n" 
-    Write-Host "            User Manipulation - Disable & PW reset                   "
-    Write-Host "____________________________________________________________________`n" 
-  
-    Write-host "Your NEW backdoor user $global:BDUser use will be ignored :-)" -ForegroundColor $global:FGCHighLight    
-        
-    $question = "`nDo you want to run these steps - Y or N? Default "
-    $answer   = Get-Answer -question $question -defaultValue $Yes
-
-    If ($answer -eq $yes)
-    {
-        $MySearchBase = Get-KeyValue -key "MySearchBase"
-        Start-UserManipulation -SearchBase $MySearchBase
-    } 
-    
-    
-    Pause
-    Clear-Host
-    Write-Host "____________________________________________________________________`n" 
-    Write-Host "                 ran ransomware attack?                               "
-    Write-Host "____________________________________________________________________`n"     
-    
-    $question = "`nDo you want to run this step - Y or N? Default "
-    $answer   = Get-Answer -question $question -defaultValue $no
-
-    If ($answer -eq $yes)
-    {
-        #run functions
-      #SimulateRansomare -Computer $mySAW
-    }
-
-
-
-
-
     Pause
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
