@@ -7,18 +7,21 @@ Requirements:
 
 - mimikatz.exe
 - NetSess.exe
-- PsExec.exe 
+- PsExec.exe
+- AS2Go-encryption.ps1 
 
 .DESCRIPTION
 
-The purpose of this script is to illustrate Defender for Identity's capabilities in identifying and detecting suspicious activities and potential attacks against your network. 
 
+AS2Go is an acronym for Attack Scenario To Go. 
+AS2Go is written in PowerShell and goes along the cyber kill-chain (with stops like Reconnaissance, Lateral Movement, Sensitive Data Access & Exfiltration and Domain Dominance) 
+My goal is to create expressive and representative Microsoft Defender for Endpoint  & Microsoft Defender for Identity alerts or rather Microsoft 365 Defender & Microsoft Sentinel incidents.
 
 .NOTES
 
-last update: 2022-01-11
+last update: 2022-01-18
 File Name  : AS2Go.ps1 | Version 2.xx
-Author     : Holger Zimmermann | hozimmer@microsoft.com
+Author     : Holger Zimmermann | hozimmer@microsoft.com | @HerrHozi
 
 
 .EXAMPLE
@@ -28,14 +31,15 @@ PS> .\AS2Go.ps1
 
 
 .LINK
-https://docs.microsoft.com/en-us/defender-for-identity/playbook-lab-overview
+https://HerrHoZi.com
 
 
 #>
 
 
 #change log
-# 2022-01-11 | v2.0.3 |  Update Function SimulateRansomare
+# 2022-01-18 | v2.0.4 |  Update Function SimulateRansomare
+# 2022-01-11 | v2.0.3 |  Add    Function SimulateRansomare
 
 
 #Check if the current Windows PowerShell session is running as Administrator. 
@@ -50,8 +54,8 @@ https://docs.microsoft.com/en-us/defender-for-identity/playbook-lab-overview
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-11"
-$version      = "2.03.000" 
+$lastupdate   = "2022-01-18"
+$version      = "2.0.4.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -71,7 +75,7 @@ $stage00 = "COMPROMISED User Account"
 $stage10 = "RECONNAISSANCE"
 $stage20 = "Lateral Movement"
 $stage30 = "ACCESS SENSITIVE DATA"
-$stage40 = "DATA DOMAIN COMPROMISED"
+$stage40 = "DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
 
 $global:FGCHeader     = "YELLOW"
@@ -106,20 +110,28 @@ function SimulateRansomare
     )
 
 $myfunction = Get-FunctionName
+
 Write-Log -Message "### Start Function $myfunction ###"
-#####
-
-
-#$BackupShare = "\\NUC-VICTIMPC\C$\TEMP\AS2Go"
 
 #prepare the simulation
 $path       =  Get-Location
 $filePrefix = (Get-Date).toString("yyyyMMdd_HHmmss")
 
 #create temp directory and fill the directory
-$FolderToEncrypt = "$BackupShare\" + $env:USERNAME
+$FolderToEncrypt = "$BackupShare\$env:USERNAME"
 New-Item -Path $FolderToEncrypt -ItemType Directory  -ErrorAction Ignore
+
+If ((Test-Path -Path $FolderToEncrypt -PathType Any -ErrorAction Ignore) -eq $false)
+    {
+    Write-Host ""
+    Write-Warning "Unable to create Folder - $FolderToEncrypt`n"
+    Write-Host "Exit function"
+    Write-Log -Message "### Exit Function $myfunction ###"
+    return
+    }
+
 Copy-Item "$path\*.*" -Destination $FolderToEncrypt -Exclude *.exe,*.ps1
+
 
 # create info for the victim
 $newFile    = "$path\$filePrefix.txt"
@@ -127,7 +139,6 @@ $newFile    = "$path\$filePrefix.txt"
 Get-Item $FolderToEncrypt\*.* | Out-File -FilePath $newFile -Append
 Copy-Item -Path ".\$filePrefix.txt" -Destination $FolderToEncrypt -Recurse
 Invoke-Item "$FolderToEncrypt\$filePrefix.txt"
-
 Write-Host "`n Content from file $FolderToEncrypt\$filePrefix.txt before encryption"
 
 
@@ -154,8 +165,6 @@ If ($answer -eq $yes)
 #####
 Write-Log -Message "### End Function $myfunction ###"
 }
-
-
 
 
 
@@ -2222,8 +2231,8 @@ Write-Host "____________________________________________________________________
 
 ################################################################################
 ######                                                                     #####
-#"#####                         CLEAN UP                                         "
-######                                                                     #####
+######                         CLEAN UP                                    #####
+#####                                                                      #####
 ################################################################################
 
 Stop-AS2GoDemo
