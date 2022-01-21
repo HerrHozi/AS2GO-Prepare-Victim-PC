@@ -20,7 +20,7 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 .NOTES
 
 last update: 2022-01-18
-File Name  : AS2Go.ps1 | Version 2.xx
+File Name  : AS2Go.ps1 | Version 2.0.5
 Author     : Holger Zimmermann | hozimmer@microsoft.com | @HerrHozi
 
 
