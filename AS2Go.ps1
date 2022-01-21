@@ -1928,16 +1928,10 @@ else
 
 # only for PosH Script testing
 If ($answer -eq $debug)
-
 {
-
-Restart-VictimMachines
-
+# function to test 
+#Restart-VictimMachines
 }
-
-
-
-
 
 
 #Pause
