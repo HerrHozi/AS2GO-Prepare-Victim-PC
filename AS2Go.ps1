@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-01-18
-File Name  : AS2Go.ps1 | Version 2.0.5
+last update: 2022-01-27
+File Name  : AS2Go.ps1 | Version 2.xx
 Author     : Holger Zimmermann | hozimmer@microsoft.com | @HerrHozi
 
 
@@ -38,6 +38,7 @@ https://herrHoZi.com
 
 
 #change log
+# 2022-01-27 | v2.0.6 |  Minor Changes
 # 2022-01-21 | v2.0.5 |  Update Function Restart-VictimMachines
 # 2022-01-18 | v2.0.4 |  Update Function SimulateRansomare
 # 2022-01-11 | v2.0.3 |  Add    Function SimulateRansomare
@@ -55,8 +56,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-21"
-$version      = "2.0.5.000" 
+$lastupdate   = "2022-01-27"
+$version      = "2.0.6.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -1928,10 +1929,16 @@ else
 
 # only for PosH Script testing
 If ($answer -eq $debug)
+
 {
-# function to test 
-#Restart-VictimMachines
+
+Restart-VictimMachines
+
 }
+
+
+
+
 
 
 #Pause
@@ -2294,7 +2301,9 @@ Write-Host "____________________________________________________________________
 Stop-AS2GoDemo
 
 
-<# Ideen 
+<# new ideas e.g.:
+
+add sid history
 
 #>
 }
