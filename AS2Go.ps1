@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 
 Attack scenario to GO - along the kill-chain (AS2Go)
@@ -19,9 +19,9 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-01-27
-File Name  : AS2Go.ps1 | Version 2.xx
-Author     : Holger Zimmermann | hozimmer@microsoft.com | @HerrHozi
+last update: 2022-08-09
+File Name  : AS2Go.ps1 | Version 2.0.6
+Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
 .EXAMPLE
@@ -37,8 +37,15 @@ https://herrHoZi.com
 #>
 
 
-#change log
-# 2022-01-27 | v2.0.6 |  Minor Changes
+
+
+################################################################################
+######                                                                     #####
+######                        Change log                                   #####
+######                                                                     #####
+################################################################################
+
+# 2022-08-09 | v2.0.6 |  Update Function Start-Reconnaissance-Part1
 # 2022-01-21 | v2.0.5 |  Update Function Restart-VictimMachines
 # 2022-01-18 | v2.0.4 |  Update Function SimulateRansomare
 # 2022-01-11 | v2.0.3 |  Add    Function SimulateRansomare
@@ -56,7 +63,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-01-27"
+$lastupdate   = "2022-08-09"
 $version      = "2.0.6.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
@@ -1529,9 +1536,9 @@ Write-Host "____________________________________________________________________
 Write-Host "            TRY to find DC's and connect to one c$ share            "
 Write-Host "____________________________________________________________________`n`n" 
 
-Write-Host " Get-ADDomainController | ft hostname, IsGlobalCatalog, IPv4Address, ComputerObjectDN" -ForegroundColor $global:FGCCommand
+Write-Host "Get-ADDomainController -filter *| ft hostname, IPv4Address, ISReadOnly, IsGlobalCatalog, site, ComputerObjectDN" -ForegroundColor $global:FGCCommand
 Write-Host ""
-Get-ADDomainController | ft hostname, IsGlobalCatalog, IPv4Address, ComputerObjectDN
+Get-ADDomainController -filter *| ft hostname, IPv4Address, ISReadOnly, IsGlobalCatalog, site, ComputerObjectDN
 Write-Host ""
 #workaround
 $directory = "\\$myDC\c$"
@@ -1778,14 +1785,14 @@ Set-NewColorSchema -NewStage $InitialStart
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "        Attack scenario to GO | along the kill-chain                "
-Write-Host "                                                                    "
 Write-Host "        AS2Go.ps1   Version $version              "
 Write-Host "                                                                    "
-Write-Host "        created by hozimmer@microsoft.com                           "
+Write-Host "        Attack scenario to GO | along the kill-chain                " -ForegroundColor yellow
+Write-Host "                                                                    "
+Write-Host "        created by Holger Zimmermann                           "
 Write-Host "        last update $lastupdate                                      "
 Write-Host "                                                                    "
-Write-Host "        Used tools / Requirements:                                  "
+Write-Host "        Used tools & requirements:                                  "
 Write-Host "                                                                    "
 Write-Host "         + mimikatz.exe                                             "
 Write-Host "         + NetSess.exe - enumerate NetBIOS Sessions                 "
@@ -1850,8 +1857,7 @@ Write-Host "____________________________________________________________________
 Write-Host "            Today I use these three (3) accounts                    "
 Write-Host "____________________________________________________________________`n" 
 
-$victim         = $env:UserName
-#$victim = "VI-20210811"
+$victim = $env:UserName
 $suffix = $victim.Substring(3)
 
 $question = "`n -> Enter or confirm your account suffix! Default "
@@ -1929,16 +1935,10 @@ else
 
 # only for PosH Script testing
 If ($answer -eq $debug)
-
 {
-
-Restart-VictimMachines
-
+# function to test 
+#Restart-VictimMachines
 }
-
-
-
-
 
 
 #Pause
@@ -2301,9 +2301,7 @@ Write-Host "____________________________________________________________________
 Stop-AS2GoDemo
 
 
-<# new ideas e.g.:
-
-add sid history
+<# Ideen 
 
 #>
 }
