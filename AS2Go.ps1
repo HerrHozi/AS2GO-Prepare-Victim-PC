@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-08-09
-File Name  : AS2Go.ps1 | Version 2.0.6
+last update: 2022-09-20
+File Name  : AS2Go.ps1 | Version 2.0.7
 Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
@@ -45,6 +45,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-09-20 | v2.0.8 |  Update Function New-BackDoorUser
+# 2022-09-09 | v2.0.7 |  Update Function Start-AS2GoDemo
 # 2022-08-09 | v2.0.6 |  Update Function Start-Reconnaissance-Part1
 # 2022-01-21 | v2.0.5 |  Update Function Restart-VictimMachines
 # 2022-01-18 | v2.0.4 |  Update Function SimulateRansomare
@@ -63,8 +65,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-08-09"
-$version      = "2.0.6.000" 
+$lastupdate   = "2022-09-20"
+$version      = "2.0.8.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -565,22 +567,29 @@ $sDescription       = "AS2GO Demo | Backdoor User"
 $BDUserPW = Get-RandomPassword
 $global:BDSecurePass = ConvertTo-SecureString -String $BDUserPW -AsPlainText -Force
 $global:BDUser       = $sSamaccountName
-new-aduser -UserPrincipalName $sUserPrincipalName -Name $sName -SamAccountName $sSamaccountName -GivenName $sFirstName -Surname $sLastname -DisplayName $sDisplayName -PasswordNeverExpires $false -Path $sPath -AccountPassword $global:BDSecurePass -PassThru | Enable-ADAccount
+
+$MyDC =  Get-KeyValue -key "mydc"
+
+new-aduser -Server $MyDC -UserPrincipalName $sUserPrincipalName -Name $sName -SamAccountName $sSamaccountName -GivenName $sFirstName -Surname $sLastname -DisplayName $sDisplayName -PasswordNeverExpires $false -Path $sPath -AccountPassword $global:BDSecurePass -PassThru | Enable-ADAccount
 
 
-Add-ADGroupMember -Identity $GroupDA -Members $sSamaccountName
-Add-ADGroupMember -Identity $GroupEA -Members $sSamaccountName
-Add-ADGroupMember -Identity $GroupGPO -Members $sSamaccountName  
+Add-ADGroupMember -Identity $GroupDA -Members $sSamaccountName -Server $MyDC
+Add-ADGroupMember -Identity $GroupEA -Members $sSamaccountName -Server $MyDC
+Add-ADGroupMember -Identity $GroupGPO -Members $sSamaccountName -Server $MyDC  
 
 Set-ADUser $sSamaccountName -Replace @{thumbnailPhoto=([byte[]](Get-Content $bthumbnailPhoto -Encoding byte))} -Initials $Initials -Title $title -Description $sDescription
 
 
 Set-KeyValue -key "LastBDUser" -NewValue $sSamaccountName
 
+
+
 Write-Host "`n`nSUMMARY:" -ForegroundColor Green
 Write-Host     "========" -ForegroundColor Green
-Get-ADUser -Identity $sSamaccountName -Properties canonicalName, Created  | select sAMAccountName, Created, userPrincipalName, name, canonicalName | ft
-Get-ADPrincipalGroupMembership -Identity $sSamaccountName | ft
+Start-Sleep -Milliseconds 500
+Get-ADUser -Server $MyDC -Identity $sSamaccountName -Properties canonicalName, Created  | select sAMAccountName, Created, userPrincipalName, name, canonicalName | ft
+Start-Sleep -Milliseconds 500
+Get-ADPrincipalGroupMembership -Server $MyDC -Identity $sSamaccountName | ft
 
 #### create credentional for further actions
 $global:BDCred = New-Object System.Management.Automation.PSCredential $sUserPrincipalName, $global:BDSecurePass
@@ -1853,8 +1862,21 @@ $myAppServer    = Get-KeyValue -key "myAppServer"
 $UseCase        = Get-KeyValue -key "usecase"
 
 Clear-Host
+
+If ($answer -eq $yes) {
+$MyInfo = "          Today I use these three (3) user accounts                    "
+$MyFGC = $global:FGCHighLight
+}
+else {
+$MyInfo = "          Still using these three (3) user accounts                    "
+$MyFGC = "White"
+}
+
+
+
+
 Write-Host "____________________________________________________________________`n" 
-Write-Host "            Today I use these three (3) accounts                    "
+Write-Host $MyInfo
 Write-Host "____________________________________________________________________`n" 
 
 $victim = $env:UserName
@@ -1872,15 +1894,32 @@ $domainadmin  = "DA-$suffix"
 
 Write-Host ""
 Write-Host "  Compromised User Account  --  " -NoNewline
-Write-Host                                  $victim -ForegroundColor $global:FGCHighLight        
+Write-Host                                  $victim -ForegroundColor $MyFGC       
 Write-Host "  Helpdesk User             --  $helpdeskuser"
 Write-Host "  Domain Admin              --  $domainadmin"
-Write-Host ""
-Write-Host "  Victim Maschine           --  $myViPC"
-Write-Host "  Admin Maschine            --  $mySAW" 
-Write-Host "  Domain Controller         --  $myDC" 
-Write-Host ""
 
+If ($answer -eq $yes)
+   {
+   Write-Host ""
+   Write-Host "  Victim Maschine           --  $myViPC"
+   Write-Host "  Admin Maschine            --  $mySAW" 
+   Write-Host "  Domain Controller         --  $myDC" 
+   
+   try {
+     Write-Output $helpdeskuser | Set-Clipboard
+     }
+   catch {
+     Write-Output $helpdeskuser | clip
+     }
+   $wshell = New-Object -ComObject Wscript.Shell
+   $Output = $wshell.Popup("Do NOT forget simulating a helpdesk support by ""$helpdeskuser"" on your Victim PC!",0,"Simulate helpdesk support on Victim PC - hd.cmd",0+64)
+  }
+  else {
+  $wshell = New-Object -ComObject Wscript.Shell
+  $Output = $wshell.Popup("Do NOT forget simulating domain activities by ""$domainadmin"" on your Admin PC!",0,"Simulate domain activities on Admin PC",0+64) 
+  }
+
+Write-Host ""
 Set-KeyValue -key "LastVictim" -NewValue $victim
 
 
