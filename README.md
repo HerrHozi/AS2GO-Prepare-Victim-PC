@@ -31,4 +31,4 @@ AS2Go.ps1
 ```
 
 
-![2022-01-06_010002](https://user-images.githubusercontent.com/96825160/148306966-d9272075-1912-4cd9-b01f-feb595e3a1e6.png)
+![2022-09-20_213311](https://user-images.githubusercontent.com/96825160/191348294-84299b4b-f070-4a4e-8e94-196752335d6d.png)
