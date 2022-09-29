@@ -66,8 +66,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-09-20"
-$version      = "2.0.8.000" 
+$lastupdate   = "2022-09-29"
+$version      = "2.0.9.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
