@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 
 Attack scenario to GO - along the kill-chain (AS2Go)
@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-09-20
-File Name  : AS2Go.ps1 | Version 2.0.7
+last update: 2022-09-29
+File Name  : AS2Go.ps1 | Version 2.0.9
 Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
@@ -45,6 +45,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
 # 2022-09-20 | v2.0.8 |  Update Function New-BackDoorUser
 # 2022-09-09 | v2.0.7 |  Update Function Start-AS2GoDemo
 # 2022-08-09 | v2.0.6 |  Update Function Start-Reconnaissance-Part1
@@ -1223,10 +1224,10 @@ Write-Host "              Try to find a PRIVILEDGE account                      
 Write-Host "              e.g. member of Helpdesk Group                         " 
 Write-Host "____________________________________________________________________`n" 
 Write-Host ""
-Write-Host "net localgroup Administrators" -ForegroundColor $global:FGCCommand
+Write-Host "Get-LocalGroupMember -Group "Administrators" | ft" -ForegroundColor $global:FGCCommand
 Write-Host ""
 Write-Host ""
-net localgroup Administrators
+Get-LocalGroupMember -Group "Administrators" | ft
 Write-Host ""
 Write-Host ""
 Write-Host "Get-ADGroupMember -Identity $globalHelpDesk -Recursive | ft" -ForegroundColor $global:FGCCommand
@@ -1803,10 +1804,10 @@ Write-Host "        last update $lastupdate                                     
 Write-Host "                                                                    "
 Write-Host "        Used tools & requirements:                                  "
 Write-Host "                                                                    "
-Write-Host "         + mimikatz.exe                                             "
-Write-Host "         + NetSess.exe - enumerate NetBIOS Sessions                 "
-Write-Host "         + PsExec.exe                                               "
-Write-Host "         + Powershell ACTIVE DIRECTORY module                       "
+Write-Host "         ●  mimikatz.exe                                             "
+Write-Host "         ●  NetSess.exe - enumerate NetBIOS Sessions                 "
+Write-Host "         ●  PsExec.exe                                               "
+Write-Host "         ●  Powershell ACTIVE DIRECTORY module                       "
 Write-Host "____________________________________________________________________`n" 
 
 $TimeStamp    = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
@@ -1989,7 +1990,7 @@ Write-Host "____________________________________________________________________
 Write-Host "        Starting with $Account User Account        "
 Write-Host "____________________________________________________________________`n" 
 Write-Host "`n NEXT STEP: " -NoNewline
-Write-Host "user $victim /domain`n" -ForegroundColor $global:FGCCommand
+Write-Host "get-aduser -Identity $victim`n" -ForegroundColor $global:FGCCommand
 
 $question = "`nDo you want to run this step - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $Yes
@@ -1998,7 +1999,8 @@ If ($answer -eq $yes)
     {
     Write-Host ""
     Write-Host ""
-    net user $victim /domain
+    #net user $victim /domain
+    get-aduser -Identity $victim -Properties AccountExpirationDate,CannotChangePassword,CanonicalName,cn,Created,Department,Description,DisplayName,EmployeeNumber,Enabled,Country,l,Manager,MemberOf,MobilePhone,userAccountControl,UserPrincipalName,LastBadPasswordAttempt,title
     Write-Host ""
     Pause
     Clear-Host
