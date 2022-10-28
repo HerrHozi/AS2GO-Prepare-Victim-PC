@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-10-08
-File Name  : AS2Go.ps1 | Version 2.1.0
+last update: 2022-10-13
+File Name  : AS2Go.ps1 | Version 2.1.1
 Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
@@ -45,7 +45,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-# 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser (line 596)
+# 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
+# 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser
 # 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
 # 2022-09-20 | v2.0.8 |  Update Function New-BackDoorUser
 # 2022-09-09 | v2.0.7 |  Update Function Start-AS2GoDemo
@@ -67,8 +68,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-10-08"
-$version      = "2.1.0.000" 
+$lastupdate   = "2022-10-13"
+$version      = "2.1.1.000" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -1260,8 +1261,8 @@ Write-Host ""
 Write-Host "Get-ADGroupMember -Identity $globalHelpDesk -Recursive | ft" -ForegroundColor $global:FGCCommand
 Write-Host ""
 Get-SensitveADUser -group $globalHelpDesk
-#Pause
-#Invoke-Item .\POI.png
+Pause
+Invoke-Item .\POI.png
 pause
 Clear-Host
 
@@ -1556,7 +1557,8 @@ Write-Host "Get-ADComputer -Filter * | ft Name, Enabled, DistinguishedName" -For
 Write-Host ""
 
 # enumerate all computer accounts 
-Get-ADComputer -Filter * -Properties * | Select -Property Name,DNSHostName,Enabled,LastLogonDate,operatingSystem | ft
+$attributes = @("Name", "Enabled", "OperatingSystem", "DistinguishedName")
+Get-ADComputer -Filter * -Properties $attributes | Select -Property $attributes | ft
 
 
 
@@ -2027,8 +2029,28 @@ If ($answer -eq $yes)
     {
     Write-Host ""
     Write-Host ""
-    #net user $victim /domain
-    get-aduser -Identity $victim -Properties AccountExpirationDate,CannotChangePassword,CanonicalName,cn,Created,Department,Description,DisplayName,EmployeeNumber,Enabled,Country,l,Manager,MemberOf,MobilePhone,userAccountControl,UserPrincipalName,LastBadPasswordAttempt,title
+    $error.Clear()
+    Try{
+    $attributes = @("AccountExpirationDate","CannotChangePassword","CanonicalName","cn","Created","Department","Description","DisplayName","EmployeeNumber","Enabled","Country","l","Manager","MemberOf","MobilePhone","userAccountControl","UserPrincipalName","LastBadPasswordAttempt","title")
+    get-aduser -Identity VI-HIP2022 -Properties $attributes -ErrorAction Stop
+
+    
+    }
+    catch {
+    $message = $_
+    Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
+    $message.Exception
+    
+    Write-Host ""
+    Write-host "  Account restrictions are preventing this user from signing in." -ForegroundColor Yellow
+    Write-HosT "  Probably helpdesk user '$helpdeskuser' is member of the 'Protected Users' Group!`n`n" -ForegroundColor Yellow
+    pause
+    Stop-AS2GoDemo
+    }
+    
+
+
+    
     Write-Host ""
     Pause
     Clear-Host
