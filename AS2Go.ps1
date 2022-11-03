@@ -5,7 +5,8 @@ Attack scenario to GO - along the kill-chain (AS2Go)
 
 Requirements:
 
-- mimikatz.exe
+- Mimikatz.exe
+- Rubeus.exe
 - NetSess.exe
 - PsExec.exe
 - AS2Go-encryption.ps1 
