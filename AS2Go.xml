@@ -2,8 +2,8 @@
 <!-- c:\temp\AS2Go -->
 <Config>
   <Script>
-    <add key="Name" value="AS2Go v2.1.0" />
-    <add key="Author" value="holgerz@semperis.com" />
+    <add key="Name" value="AS2Go v2.5.x" />
+    <add key="Author" value="me@mrhozi.com" />
   </Script>
   <DefaultParameter>
     <!-- Use Case -->
