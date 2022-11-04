@@ -106,9 +106,9 @@ $global:BDSecurePass  = ""
 $global:BDUser        = ""
 $global:BDCred        = ""
 
-$GroupDA   = "Domain Admins"
-$GroupEA   = "Enterprise Admins"
-$GroupGPO  = "Group Policy Creator Owners"
+$GroupDA   = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-512")}).name
+$GroupEA   = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-519")}).name
+$GroupGPO  = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-520")}).name
 
 ################################################################################
 ######                                                                     #####
@@ -138,7 +138,7 @@ Function New-PasswordSprayAttack()
            $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
            if ($Domain_check.name -ne $null)
               {
-              Write-Host -ForegroundColor Green "[*] SUCCESS! User:$User Password:$Password"
+              Write-Host -ForegroundColor Green "[*] MATCH - User:$User Password:$Password"
               }
          }
 
@@ -1870,9 +1870,9 @@ If ($laststage -eq $stage50)
     } 
 
 $question = "`nStarts the use case from the begin? Default "
-$answer   = Get-Answer -question $question -defaultValue $StartValue
+$Begin   = Get-Answer -question $question -defaultValue $StartValue
 
-If ($answer -eq $yes)
+If ($Begin -eq $yes)
 
 {
 Set-KeyValue -key "LastStage" -NewValue $stage50
@@ -1936,7 +1936,7 @@ Get-AS2GoSettings
 
 Clear-Host
 Update-WindowTitle -NewTitle $stage05
-Set-KeyValue -key "LastStage" -NewValue $stage05
+#Set-KeyValue -key "LastStage" -NewValue $stage05
 Show-Step -step "step_004.html"
 Do 
 {
@@ -1958,7 +1958,7 @@ pause
 
 $MyDomain = $env:USERDNSDOMAIN
 $MyPath   = Get-KeyValue -key "MySearchBase"
-$NoU = (Get-ADUser -filter * -SearchBase $MyPath).count
+$NoU      = (Get-ADUser -filter * -SearchBase $MyPath).count
 
 #first run with random password
 $MyPW01 = Get-RandomPassword
@@ -2046,7 +2046,7 @@ $UseCase        = Get-KeyValue -key "usecase"
 
 Clear-Host
 
-If ($answer -eq $yes) {
+If ($Begin -eq $yes) {
 $MyInfo = "          Today I use these three (3) user accounts                    "
 $MyFGC = $global:FGCHighLight
 }
@@ -2056,7 +2056,7 @@ $MyFGC = "White"
 }
 
 
-
+Update-WindowTitle -NewTitle "Used Accounts"
 
 Write-Host "____________________________________________________________________`n" 
 Write-Host $MyInfo
@@ -2081,7 +2081,7 @@ Write-Host                                  $victim -ForegroundColor $MyFGC
 Write-Host "  Helpdesk User             --  $helpdeskuser"
 Write-Host "  Domain Admin              --  $domainadmin"
 
-If ($answer -eq $yes)
+If ($Begin -eq $yes)
    {
    Write-Host ""
    Write-Host "  Victim Maschine           --  $myViPC"
