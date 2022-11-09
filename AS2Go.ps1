@@ -74,8 +74,10 @@ https://herrHoZi.com
 
 #region Global Settings
 
-$lastupdate   = "2022-11-04"
-$version      = "2.5.6.0" 
+[bool]$showStep = $false # show the steps in an image
+
+$lastupdate   = "2022-11-09"
+$version      = "2.5.7.0" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -91,6 +93,7 @@ $debug = "D"
 $GoldenTicket = "GT"
 $InitialStart = "Start"
 $PrivledgeAccount = $no
+
 
 $stage00 = "COMPROMISED User Account"
 $stage05 = "BRUCE FORCE or PW SPRAY"
@@ -161,6 +164,8 @@ Write-Host "Step 1 - Finding Vulnerable Certificate Templates " -ForegroundColor
 Write-host "- certify.exe find /vulnerable"
 pause
 #get the Enterprise CA name
+Invoke-Command -ScriptBlock {certutil}
+pause
 $MyCAConfig = Invoke-Command -ScriptBlock {certutil}
 $temp = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
 $myEntCA = $temp[1]
@@ -863,7 +868,7 @@ Write-Log -Message "### End Function $myfunction ###"
 
 function Start-Exfiltration {
 
-Show-Step step_010.html
+If ($showStep){Show-Step step_010.html}
 
 $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
@@ -906,7 +911,7 @@ write-host " more C:\temp\as2go\my-passwords.txt`n" -ForegroundColor $global:FGC
 Pause
 Clear-Host
 
-Show-Step step_011.html
+If ($showStep){Show-Step step_011.html}
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                  Data exfiltration over SMB Share                  "
 Write-Host "____________________________________________________________________`n" 
@@ -2063,7 +2068,9 @@ Get-AS2GoSettings
 Clear-Host
 Update-WindowTitle -NewTitle $stage05
 #Set-KeyValue -key "LastStage" -NewValue $stage05
-Show-Step -step "step_004.html"
+
+If ($showStep){Show-Step -step "step_004.html"}
+
 Do 
 {
 Clear-Host
@@ -2202,7 +2209,7 @@ Pause
 
 Update-WindowTitle -NewTitle $stage00
 #Set-KeyValue -key "LastStage" -NewValue $stage10
-Show-Step -step "step_000.html"
+If ($showStep){Show-Step -step "step_000.html"}
 
 Do
 {
@@ -2249,7 +2256,7 @@ If ($answer -eq $debug)
 
 
 #Pause
-Show-Step -step $UserPic
+If ($showStep){Show-Step -step $UserPic}
 Start-NetSess -server $myDC
 
 Clear-Host
@@ -2333,7 +2340,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 
 Update-WindowTitle -NewTitle $stage10
 #Set-KeyValue -key "LastStage" -NewValue $stage10
-Show-Step -step "step_006.html"
+If ($showStep){Show-Step -step "step_006.html"}
 Do 
 {
 Clear-Host
@@ -2393,7 +2400,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 
 Update-WindowTitle -NewTitle $stage20
 Set-KeyValue -key "LastStage" -NewValue $stage20
-Show-Step -step "step_007.html"
+If ($showStep){Show-Step -step "step_007.html"}
 Do 
 {
 Clear-Host
@@ -2409,13 +2416,13 @@ If ($answer -eq $PtH)
 
 {
     #Starting Pass-the-Hash (PtH) Attack on VictimPC
-    Show-Step -step step_007_PtH.html  
+    If ($showStep){Show-Step -step step_007_PtH.html}  
     Start-PtH-Attack
 }
 elseif ($answer -eq $PtT)
 
 {
-    Show-Step -step step_007_PtT.html 
+    If ($showStep){Show-Step -step step_007_PtT.html} 
     Start-PtT-Attack
 }
 
@@ -2448,7 +2455,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 
 Update-WindowTitle -NewTitle $stage25
 Set-KeyValue -key "LastStage" -NewValue $stage25
-Show-Step -step "step_007.html"
+If ($showStep){Show-Step -step "step_007.html"}
 Do 
 {
 Clear-Host
@@ -2467,7 +2474,7 @@ $answer   = Get-Answer -question $question -defaultValue $No
 If ($answer -eq $yes)
 
 {
-    
+    Invoke-Command -ScriptBlock {certutil}
     $PemToPFXFile  = FindVulnerableCATemplates -altname $domainadmin
     
     #Starting Pass-the-Hash (PtH) Attack on VictimPC
@@ -2570,7 +2577,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 
 Update-WindowTitle -NewTitle $stage30
 Set-KeyValue -key "LastStage" -NewValue $stage30
-Show-Step "step_010.html"
+If ($showStep){Show-Step "step_010.html"}
 
 Do
 {
@@ -2619,7 +2626,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 
 Update-WindowTitle -NewTitle $stage40
 Set-KeyValue -key "LastStage" -NewValue $stage40
-Show-Step step_012.html
+If ($showStep){Show-Step step_012.html}
 Do
 {
 Clear-Host
