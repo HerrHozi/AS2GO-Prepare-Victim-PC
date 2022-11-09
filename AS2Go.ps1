@@ -5,6 +5,7 @@ Attack scenario to GO - along the kill-chain (AS2Go)
 
 Requirements:
 
+- Certify.exe
 - Mimikatz.exe
 - Rubeus.exe
 - NetSess.exe
