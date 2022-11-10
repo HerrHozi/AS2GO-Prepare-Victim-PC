@@ -1194,7 +1194,7 @@ $myViPC =         Get-KeyValue -key "myViPC"
 $fqdn =           Get-KeyValue -key "fqdn"
 $pthntml =        Get-KeyValue -key "pthntml"
 $krbtgtntml =     Get-KeyValue -key "krbtgtntml"
-$OpenSSL =    Get-KeyValue -key "OpenSSL"
+$OpenSSL =        Get-KeyValue -key "OpenSSL"
 $globalHelpDesk = Get-KeyValue -key "globalHelpDesk"
 $ticketsUNCPath = Get-KeyValue -key "ticketsPath"
 $ticketsDir     = Get-KeyValue -key "ticketsDir"
@@ -2935,6 +2935,9 @@ Stop-AS2GoDemo
 
 
 <# Ideen 
+
+
+enter-pssession -ComputerName Ch01-DSP-MGMT
 
 #>
 }
