@@ -244,10 +244,32 @@ Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor
 Get-ADDefaultDomainPasswordPolicy
 
 $info = Get-ADDefaultDomainPasswordPolicy
+[int] $NoLT = $info.LockoutThreshold
 
-Write-Host "Number of failed logon attempts that causes a user account to be locked out is: " -NoNewline
-Write-Host $info.LockoutThreshold -ForegroundColor Yellow
+If ($NoLT -eq 0)
+{
 
+#The number of failed logon attempts that causes a user account to be locked out is 0;
+#this means the account will NEVER be locked out.
+Write-Host "The number of failed logon attempts that causes a user account to be locked out is " -NoNewline
+Write-Host $NoLT -ForegroundColor Yellow -NoNewline ; Write-Host ";"
+Write-Host "this means the account will"  -NoNewline
+Write-Host " NEVER " -ForegroundColor Yellow -NoNewline
+Write-Host "be locked out."
+}
+else
+{
+# The number of failed logon attempts that causes a user account to be locked out is [n];
+# this means you can run a maximum of [n-1] single 'Password Spray' Attacks.
+[int] $NoPS = $NoLT - 1
+Write-Host "The number of failed logon attempts that causes a user account to be locked out is " -NoNewline
+Write-Host $NoLT -ForegroundColor Yellow -NoNewline; Write-Host ";"
+Write-Host "this means you can run a maximum of " -NoNewline
+Write-Host $NoPS -ForegroundColor Yellow -NoNewline
+Write-Host " single 'Password Spray' Attacks."
+}
+
+Write-Host""
 pause
 
 $MyDomain = $env:USERDNSDOMAIN
@@ -1277,7 +1299,7 @@ for ($counter = 0; $counter -lt $MyParameter.Length; $counter++ )
 }
 
 
-$question = "`n -> Are theses values correct - Y or N? Default "
+$question = "`n -> Are these values correct - Y or N? Default "
 $prompt   = Get-Answer -question $question -defaultValue $yes
 
 if ($prompt -ne $yes) 
@@ -1745,7 +1767,7 @@ $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 ####
 Write-Host "____________________________________________________________________`n" 
-Write-Host "                TRY to enumerate Domain Admins members              "
+Write-Host "       TRY to enumerate the members of the Domain Admins Groups     "
 Write-Host "____________________________________________________________________`n`n" 
 
 Write-Host " Get-ADGroupMember -Identity 'Domain Admins' -Recursive | ft" -ForegroundColor $global:FGCCommand
@@ -2033,7 +2055,7 @@ If ($laststage -eq $stage50)
     $StartValue = $no
     } 
 
-$question = "`nStarts the use case from the begin? Default "
+$question = "`nStarts the attack scenario from the beginning? Default "
 $Begin   = Get-Answer -question $question -defaultValue $StartValue
 
 If ($Begin -eq $yes)
@@ -2121,7 +2143,7 @@ Do
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                   Attack Level - Bruce Force Account                    "
-Write-Host "               in this case we run an Password Spray Attack         "
+Write-Host "           ... in this case, we run a Password Spray Attack ...         "
 Write-Host "____________________________________________________________________`n" 
 
 $question = "`nDo you want to run this step - Y or N? Default "
@@ -2239,7 +2261,7 @@ If ($Begin -eq $yes)
      Write-Output $helpdeskuser | clip
      }
    $wshell = New-Object -ComObject Wscript.Shell
-   $Output = $wshell.Popup("Do NOT forget simulating a helpdesk support by ""$helpdeskuser"" on your Victim PC!",0,"Simulate helpdesk support on Victim PC - hd.cmd",0+64)
+   $Output = $wshell.Popup("Do NOT forget to simulate helpdesk support by ""$helpdeskuser"" on your Victim PC!",0,"Simulate helpdesk support on Victim PC - hd.cmd",0+64)
   }
   else {
   $wshell = New-Object -ComObject Wscript.Shell
@@ -2464,7 +2486,7 @@ Write-Host "____________________________________________________________________
 
 Write-Host "Choose your Lateral Movement Technique!                 "
 
-$question = "`nEnter Pass-the-Hash (H), Pass-the-Ticket (T) or skip (S) this attack! Default "
+$question = "`nEnter [H] for Pass-the-Hash, [T] for Pass-the-Ticket, or [S] to skip this attack! Default "
 $answer   = Get-Answer -question $question -defaultValue $LateralMovement
 
 If ($answer -eq $PtH)
@@ -2641,6 +2663,32 @@ pause
 }
 
 #endregion Step 3 - Requesting Certificate with Certify
+
+
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "      Step 4 - Converting PEM to PFX                   "
+Write-Host "____________________________________________________________________`n"
+
+
+
+
+Clear-Host
+Write-Host "____________________________________________________________________`n" 
+Write-Host "      Step 5 - Converting PEM to PFX                   "
+Write-Host "____________________________________________________________________`n"
+
+Try
+{
+Enter-PSSession -ComputerName $env:USERDNSDOMAIN -ErrorAction Stop
+}
+Catch
+{
+    $message = $_
+    Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
+    $message.Exception
+}
+
 
 Clear-Host
 
@@ -2938,6 +2986,31 @@ Stop-AS2GoDemo
 
 
 enter-pssession -ComputerName Ch01-DSP-MGMT
+
+
+Do
+{
+$NamePrefix = (65..90) | Get-Random -Count 1 | % {[char]$_}
+$count = (Get-ADUser -Filter "name -like '$NamePrefix*'").count
+} Until ([int]$count -gt 0)
+
+# Starting manipulation of xx users whose names begin with an xx ...
+Write-Host "Starting manipulation of " -NoNewline
+Write-Host $Count -NoNewline -ForegroundColor Yellow
+Write-Host " users whose names begin with an " -NoNewline
+Write-host -NoNewline $NamePrefix -ForegroundColor Yellow
+Write-Host " ...`n"
+pause
+
+$attributes = @("name","samaccountname","Enabled","pwdLastSet ","whenChanged")
+Get-ADUser -Filter "name -like '$NamePrefix*'"  | Disable-ADAccount
+Get-ADUser -Filter "name -like '$NamePrefix*'" -Properties * | Select $attributes | ft
+
+pause 
+
+Get-ADUser -Filter "name -like '$NamePrefix*'"  | Enable-ADAccount
+Get-ADUser -Filter "name -like '$NamePrefix*'" -Properties * | Select $attributes | ft
+
 
 #>
 }
