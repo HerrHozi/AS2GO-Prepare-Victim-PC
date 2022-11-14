@@ -2,8 +2,8 @@
 <!-- c:\temp\AS2Go -->
 <Config>
   <Script>
-    <add key="Name" value="AS2Go v2.1.0" />
-    <add key="Author" value="holgerz@semperis.com" />
+    <add key="Name" value="AS2Go v2.6.0" />
+    <add key="Author" value="me@mrhozi.com" />
   </Script>
   <DefaultParameter>
     <!-- Use Case -->
@@ -25,15 +25,17 @@
     <add key="pthntml" value="[value can be set during the attack]" />
     <add key="krbtgtntml" value="[value can be set during the attack]" />
 	<!-- MDI Settings - Changes are required -->
-    <add key="Honeytoken" value="HZ-Root-Admin@sandbox.corp" />
+    <add key="Honeytoken" value="MyBGA@mrhozi.com" />
 	<!-- Do NOT change these parameter needed for PtT -->
     <add key="ticketsDir" value="C:\temp\tickets" />
     <add key="ticketsPath" value="c$\temp\tickets" />
     <!-- Parameter -->
     <add key="time2reboot" value="99" />
+    <add key="OpenSSL" value="C:\Program Files\OpenSSL-Win64\start.bat" />
+    <add key="EnterpriseCA" value="ROOT-DC19-01.WS19-ROOT.CORP\WS19-ROOT" />
     <!-- Spare part -->
     <add key="ImageViewer" value="xxx" />
-	<add key="SP01" value="xxx" />
+    <add key="SP01" value="xxx" />
     <add key="SP02" value="xxx" />
     <add key="SP03" value="xxx" />
     <add key="SP04" value="xxx" />
