@@ -34,7 +34,6 @@
     <add key="OpenSSL" value="C:\Program Files\OpenSSL-Win64\start.bat" />
     <add key="EnterpriseCA" value="xxx" />
     <!-- Spare part -->
-    <add key="ImageViewer" value="xxx" />
     <add key="SP01" value="xxx" />
     <add key="SP02" value="xxx" />
     <add key="SP03" value="xxx" />
