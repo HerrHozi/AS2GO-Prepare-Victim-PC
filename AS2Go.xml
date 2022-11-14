@@ -32,7 +32,7 @@
     <!-- Parameter -->
     <add key="time2reboot" value="99" />
     <add key="OpenSSL" value="C:\Program Files\OpenSSL-Win64\start.bat" />
-    <add key="EnterpriseCA" value="ROOT-DC19-01.WS19-ROOT.CORP\WS19-ROOT" />
+    <add key="EnterpriseCA" value="xxx" />
     <!-- Spare part -->
     <add key="ImageViewer" value="xxx" />
     <add key="SP01" value="xxx" />
