@@ -709,15 +709,13 @@ Write-Log -Message "### End Function $myfunction ###"
 
 }
 
-Function Set-ProgressBar 
-{
+Function Set-ProgressBar {
     Param ([int] $Step, [int] $TotalSteps, [string] $User)
     $progress = [int] (($Step - 1) / $TotalSteps * 100)
     Write-Progress -Activity "Run Password Spray against user $User" -status "Completed $progress % of Password Spray Attack" -PercentComplete $progress
 }
 
-function SimulateRansomare
-{
+function SimulateRansomare {
 
     [CmdletBinding()]
     Param(
@@ -834,8 +832,7 @@ function Get-Files {
     return $files
 }
 
-Function CreateGoldenTicket
-{
+Function CreateGoldenTicket {
 
 
 $myfunction = Get-FunctionName
@@ -950,8 +947,7 @@ Write-Log -Message "### Start Function $myfunction ###"
 Write-Log -Message "### End Function $myfunction ###"
 }
 
-function Restart-VictimMachines
-{
+function Restart-VictimMachines {
 
 $myfunction = Get-FunctionName
 Write-Log -Message "### Start Function $myfunction ###"
@@ -1795,7 +1791,7 @@ Write-Host "`nGet-ChildItem -Directory $directory -Filter *.* -ErrorAction Silen
 
 Try
 {
-Get-ChildItem -Path $directory
+Get-ChildItem -Path $directory | Out-Host
 #dir $directory -Force -ErrorAction Stop
 Write-Host "`n   --> You have ACCESS to direcotry '$directory'`n" -ForegroundColor $global:FGCQuestion
 }
@@ -2110,8 +2106,8 @@ write-host ""
 #Access-Directory -directory "\\$mydc\c$\*.*"
 #workaround
 $directory = "\\$myDC\c$"
-(Get-Directories -Path $directory) | Out-File -FilePath $tmp
-Get-Content -Path $tmp
+Get-Directories -Path $directory
+
 
 
 Pause
