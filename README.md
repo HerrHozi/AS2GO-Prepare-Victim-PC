@@ -32,3 +32,14 @@ AS2Go.ps1
 
 
 ![2022-09-20_213311](https://user-images.githubusercontent.com/96825160/191348294-84299b4b-f070-4a4e-8e94-196752335d6d.png)
+
+
+## What's New ....
+# with v2.6
+
+Preview #1
+	• syntax highlighting
+ 	• Kerberoasting attack
+
+![As2Go-Preview-01](https://user-images.githubusercontent.com/96825160/203348771-4aa6f28c-6136-419f-989c-a206ceac6d1f.gif)
+
