@@ -10,6 +10,7 @@ Requirements:
 - Rubeus.exe
 - NetSess.exe
 - PsExec.exe
+- OpenSSL.exe
 - AS2Go-encryption.ps1 
 
 .DESCRIPTION
@@ -234,7 +235,7 @@ function Write-Highlight {
     If ($NoNewline -eq $false) { Write-Host '' | out-host }
 
 
-    Write-Log -Message "    >> using $CAtemplate"
+    Write-Log -Message "    >> using $Text"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 }
@@ -455,23 +456,24 @@ function Get-VulnerableCertificateTemplate {
     #####                                                                      #####
     ################################################################################
 
+    Param([string] $myEntCA)
+
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #region ####################### main code #########################
     $CAtemplate = "AS2Go"
-
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\certify.exe ", "find ","/vulnerable" `
-                    -Color $fgcC, $fgcF,$fgcS
+    Write-Highlight -Text ".\certify.exe ", "find ","/vulnerable /ca:","""$myEntCA""" `
+                    -Color $fgcC, $fgcF,$fgcS,$fgcV
     Write-Host ""
-    Write-log -Message "     .\certify.exe find /vulnerable"
+    Write-log -Message "     .\certify.exe find /vulnerable /ca:$myEntCA"
     
     $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $no
 
     If ($answer -eq $yes) {
         #find vulnerable CA templates
-        Invoke-Command -ScriptBlock { .\certify.exe find /vulnerable } | Out-Host
+        Invoke-Command -ScriptBlock { .\certify.exe find /vulnerable /ca:"$myEntCA" } | Out-Host
         Write-Host "`nFound Vulnerable Certificate Templates - $CAtemplate" -ForegroundColor $fgcH
     }
 
@@ -1474,7 +1476,19 @@ Set-NewBackgroundColor -BgC "Blue" -FgC "White"
         $global:FGCQuestion = "Yellow"
         $global:FGCHighLight = "Yellow"
         $global:FGCError = "DarkBlue"
+
+#Color Schema for the next command
+      $fgcS = "Black" # Switch
+      $fgcC = "Yellow"   # Command
+
+[string] $fgcF = (get-host).ui.rawui.ForegroundColor
+If ($fgcF-eq "-1") {$fgcF = "White"}
+
+$fgcV = $fgcF # Value
+     $fgcH = "Yellow" 
+
         Set-NewBackgroundColor -BgC "DarkBlue" -FgC "White"
+        Set-NewBackgroundColor -BgC "DarkGray" -FgC "White"
     }
     elseif ($NewStage -eq $PtT) {
         $global:FGCCommand = "Green"
@@ -1498,7 +1512,7 @@ Set-NewBackgroundColor -BgC "Blue" -FgC "White"
         Set-NewBackgroundColor -BgC "Black" -FgC "Gray"
     }
 
-    Write-Log -Message "Set Color Schema for $NewStage"
+    Write-Log -Message "    >> Set Color Schema for $NewStage"
     #####
     Write-Log -Message "### End Function $myfunction ###"
 
@@ -1526,7 +1540,7 @@ Function Set-NewBackgroundColor {
     $a.BackgroundColor = $BgC
     $a.ForegroundColor = $FgC ; Clear-Host
 
-    Write-Log -Message "New Color Set $Bgc and $Fgc"
+    Write-Log -Message "    >> New Color Set $Bgc and $Fgc"
 
 
     #####
@@ -1570,7 +1584,7 @@ Function Get-Answer {
     $prompt = Read-Host "[$($defaultValue)]" 
     if ($prompt -eq "") { $prompt = $defaultValue } 
 
-    Write-Log -Message "Q:$question  A:$prompt"
+    Write-Log -Message "    >> Q:$question  A:$prompt"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 
@@ -2337,7 +2351,7 @@ function Confirm-FileAvailabliy {
         [String]   $FileVersion = (get-item "$path\$filename").VersionInfo.FileVersion
         $build = Get-date -date $LastWriteTime -Format yyyyMMdd
         $release = ("Release: " + $FileVersion.PadRight(9, [Char]32) + "(last build $build)")
-        Write-Log -Message "Version of $filename is $release!"
+        Write-Log -Message "    >> Version of $filename is $release!"
         #write-host $release 
     }
 
@@ -2455,16 +2469,16 @@ Function Start-AS2GoDemo {
         Write-Host "                                                                    "
         Write-Host "        Used tools & requirements:                                  "
         Write-Host "                                                                    "
-        Write-Host "        ●  ACTIVE DIRECTORY PoSH module                       "
+        Write-Host "        ●  ACTIVE DIRECTORY PoSH module                             "
         Write-Host "                                                                    "
-        Write-Host "        ●  NetSess.exe    $FileVersionN                            "
-        Write-Host "        ●  Mimikatz.exe   $FileVersionM                            "
+        Write-Host "        ●  NetSess.exe    $FileVersionN                             "
+        Write-Host "        ●  Mimikatz.exe   $FileVersionM                             "
         Write-Host "                                                                    "
-        Write-Host "        ●  Rubeus.exe     $FileVersionR                            "
-        Write-Host "        ●  Certify.exe    $FileVersionC                            "
-        Write-Host "        ●  OpenSSL.exe    $FileVersionO                            "
+        Write-Host "        ●  Rubeus.exe     $FileVersionR                             "
+        Write-Host "        ●  Certify.exe    $FileVersionC                             "
+        Write-Host "        ●  OpenSSL.exe    $FileVersionO                             "
         Write-Host "                                                                    "
-        Write-Host "        ●  PsExec.exe     $FileVersionP                            "
+        Write-Host "        ●  PsExec.exe     $FileVersionP                             "
         Write-Host "____________________________________________________________________`n" 
 
         $TimeStamp = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
@@ -2985,8 +2999,7 @@ Function Start-AS2GoDemo {
 
             #region Step 2 - Finding an Vulnerable Certificate Templates
 
-
-            $CAtemplate = Get-VulnerableCertificateTemplate
+            $CAtemplate = Get-VulnerableCertificateTemplate -myEntCA $EnterpriseCA
 
             #endregion Step 2 - Finding an Vulnerable Certificate Templates
 
