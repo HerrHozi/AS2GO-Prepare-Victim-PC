@@ -47,6 +47,7 @@ https://herrHoZi.com
 ######                                                                     #####
 ################################################################################
 
+# 2022-11-27 | v2.5.9 |  Add Functions Get-ComputerInformation & Reset-Password
 # 2022-11-24 | v2.5.8 |  Add Function Get-ADGroupNameBasedOnSIDSuffix
 # 2022-11-19 | v2.5.7 |  Add new color schema for next command
 # 2022-11-13 | v2.5.6 |  Add Attack - Steal or Forge Authentication Certificates
@@ -89,7 +90,7 @@ Param (
 [bool]$showStep = $true # show the steps in an image
 [bool]$skipstep = $false # show the steps in an image
 
-$lastupdate = "2022-11-24"
+$lastupdate = "2022-11-27"
 $version = "2.5.9.0" 
 $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
@@ -106,7 +107,6 @@ $InitialStart = "Start"
 $PrivledgeAccount = $no
 
 $tmp = "$path\AS2Go.tmp"
-#$debug = "D"
 $RUBEUS = "Rubeus.exe"
 
 $stage00 = "COMPROMISED User Account"
@@ -129,12 +129,11 @@ $global:BDUser = ""
 $global:BDCred = ""
 
 
-$fgcS = "Gray" # Switch - DarkGray
-$fgcC = "Yellow"   # Command
-$fgcV = "Cyan" # Value
+$fgcS = "Gray"    # Switch - DarkGray
+$fgcC = "Yellow"  # Command
+$fgcV = "Cyan"    # Value
 $fgcF = "White"
 $fgcH = "Yellow" 
-
 
 $WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
@@ -173,7 +172,6 @@ function MyTemplate {
 
     return $true
 }
-
 
 function Get-ComputerInformation {
 
