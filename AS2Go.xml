@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- c:\temp\AS2Go -->
 <Config>
   <Script>
@@ -14,36 +14,36 @@
     <add key="myViPC" value="[filled automatically]" />
     <add key="fqdn" value="[filled automatically]" />
     <add key="DomainSID" value="[filled automatically]" />
-	<!-- Domain Settings - Changes are required -->
-	<add key="mySAW" value="[your AdminPC]" />
-	<add key="myAppServer" value="[your DC or AdminPC]" />
-    <add key="BDUsersOU" value="OU=Users,OU=AS2Go,DC=sandbox,DC=corp" />
-    <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=sandbox,DC=corp" />
+	  <!-- Domain Settings - Changes are required -->
+	  <add key="mySAW" value="[your AdminPC]" />
+	  <add key="myAppServer" value="[your DC or AdminPC]" />
+    <add key="BDUsersOU" value="CN=Users,DC=xxxx,DC=xxx" />
+    <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=xxx,DC=xxx" />
     <add key="OfflineDITFile" value="\\DC01\AD-Backup" />
     <add key="globalHelpDesk" value="SG-AS2Go-Helpdesk" />
-	<!-- Needed for Lateral Movement & Golden Ticket - Changes are required -->
+	  <!-- Needed for Lateral Movement & Golden Ticket - Changes are required -->
     <add key="pthntml" value="[value can be set during the attack]" />
     <add key="krbtgtntml" value="[value can be set during the attack]" />
-	<!-- MDI Settings - Changes are required -->
+	  <!-- MDI Settings - Changes are required -->
     <add key="Honeytoken" value="MyBGA@mrhozi.com" />
-	<!-- Do NOT change these parameter needed for PtT -->
+	  <!-- Do NOT change these parameter needed for PtT -->
     <add key="ticketsDir" value="C:\temp\tickets" />
     <add key="ticketsPath" value="c$\temp\tickets" />
     <!-- Parameter -->
-    <add key="time2reboot" value="99" />
+    <add key="time2reboot" value="15" />
     <add key="OpenSSL" value="C:\Program Files\OpenSSL-Win64\start.bat" />
     <add key="EnterpriseCA" value="xxx" />
     <!-- Spare part -->
-    <add key="SP01" value="xxx" />
+    <add key="SP01" value="PassWOrd!" />
     <add key="SP02" value="xxx" />
     <add key="SP03" value="xxx" />
     <add key="SP04" value="xxx" />
     <!-- no need for modification -->
-    <add key="LastStart" value="2022-11-15 15:59:44" />
-    <add key="LastFinished" value="2022-11-15 15:55:26" />
+    <add key="LastStart" value="2022-12-01 00:00:02" />
+    <add key="LastFinished" value="2022-12-01 00:13:20" />
     <add key="LastDuration" value="00:13:18 [h]" />
     <add key="LastVictim" value="VI-HerrHoZi" />
-    <add key="LastBDUser" value="BD-20220105.155326" />
+    <add key="LastBDUser" value="BD-20221201.001126" />
     <add key="LastStage" value="COMPLETE" />
   </DefaultParameter>
 </Config>
