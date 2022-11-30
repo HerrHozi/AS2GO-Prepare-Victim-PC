@@ -20,7 +20,9 @@ Warning
 - [latest release of Mimikatz.exe](https://github.com/gentilkiwi/mimikatz/releases/)
 - [latest release of NetSees.exe](https://www.joeware.net/freetools/tools/netsess/)
 - [latest release of Psexec.exe](https://docs.microsoft.com/en-us/sysinternals/downloads/psexec/)
-
+- [latest release of Certify.exe](https://github.com/GhostPack/Certify/)
+- [latest release of Rubeus.exe](https://github.com/GhostPack/Rubeus/)
+- [latest release of OpenSSL.exe](https://www.openssl.org//)
 
 
 
