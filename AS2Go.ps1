@@ -700,7 +700,7 @@ function Start-KerberoastingAttack {
         Write-host "Known as Brute-force or mask attack."
         Write-Host "The cracking mode for TGS-REP hashes is 13100.`n"
         
-        # example: .\hashcat.exe -a 3 -m 13000 ./SANDBOX.CORP.hashes.txt ?u?l?l?l?l?l?d?d
+        # example: .\hashcat.exe -a 3 -m 13100 ./SANDBOX.CORP.hashes.txt ?u?l?l?l?l?l?d?d
         Write-Host      -NoNewline "  Example: "
         Write-Highlight -Text ".\hashcat.exe ", "-a ","3"," -m ", "13000 ", "./$hashes ", "?u?l?l?l?l?l?d?d" `
                         -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcV, $fgcF
