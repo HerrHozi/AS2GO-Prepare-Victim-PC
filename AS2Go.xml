@@ -1,49 +1,60 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- c:\temp\AS2Go -->
 <Config>
-  <Script>
-    <add key="Name" value="AS2Go v2.6.0" />
-    <add key="Author" value="me@mrhozi.com" />
-  </Script>
+  <Scripts>
+    <Script Name="Name" Value="AS2Go" />
+    <Script Name="Version" Value="2.8" />
+    <Script Name="Author" Value="me@mrhozi.com" />
+  </Scripts>
   <DefaultParameter>
     <!-- Use Case -->
-    <add key="UseCase" value="Attack scenario to GO" />
-    <add key="DemoTitle" value="Attack scenario to GO - along the kill-chain" />
-    <!-- Domain Settings - automatically filled -->
-    <add key="mydc" value="[filled automatically]" />
-    <add key="myViPC" value="[filled automatically]" />
-    <add key="fqdn" value="[filled automatically]" />
-    <add key="DomainSID" value="[filled automatically]" />
-	  <!-- Domain Settings - Changes are required -->
-	  <add key="mySAW" value="[your AdminPC]" />
-	  <add key="myAppServer" value="[your DC or AdminPC]" />
-    <add key="BDUsersOU" value="CN=Users,DC=xxxx,DC=xxx" />
-    <add key="MySearchBase" value="OU=Demo Accounts,OU=AS2Go,DC=xxx,DC=xxx" />
-    <add key="OfflineDITFile" value="\\DC01\AD-Backup" />
-    <add key="globalHelpDesk" value="SG-AS2Go-Helpdesk" />
-	  <!-- Needed for Lateral Movement & Golden Ticket - Changes are required -->
-    <add key="pthntml" value="[value can be set during the attack]" />
-    <add key="krbtgtntml" value="[value can be set during the attack]" />
-	  <!-- MDI Settings - Changes are required -->
-    <add key="Honeytoken" value="MyBGA@mrhozi.com" />
-	  <!-- Do NOT change these parameter needed for PtT -->
-    <add key="ticketsDir" value="C:\temp\tickets" />
-    <add key="ticketsPath" value="c$\temp\tickets" />
+    <Setting Name="UseCase" Value="Attack scenario to GO" />
+    <Setting Name="DemoTitle" Value="Attack scenario to GO - along the kill-chain" />
+    <!-- Domain Setting - automatically filled -->
+    <Setting Name="mydc" Value="[filled automatically]" />
+    <Setting Name="myViPC" Value="[filled automatically]" />
+    <Setting Name="fqdn" Value="[filled automatically]" />
+    <Setting Name="DomainSID" Value="[filled automatically]" />
+    <!-- Domain Setting - Changes are required -->
+    <Setting Name="mySAW" Value="[your AdminPC]" />
+    <Setting Name="myAppServer" Value="[your DC or AdminPC]" />
+    <Setting Name="BDUsersOU" Value="[CN=Users,DC=xxx,DC=xxx]" />
+    <Setting Name="MySearchBase" Value="[OU=Demo Accounts,OU=AS2Go,DC=xxx,DC=xxx]" />
+    <Setting Name="OfflineDITFile" Value=" [\\Your server\AD-Backup]" />
+    <Setting Name="globalHelpDesk" Value="SG-AS2Go-Helpdesk" />
+    <!-- MDI Setting - Changes are required -->
+    <Setting Name="Honeytoken" Value="me@mrhozi.com" />
+    <!-- Need for Latermovement - Changes are required -->
+    <Setting Name="pthntml" Value="[value can be set during the attack]" />
+    <Setting Name="krbtgtntml" Value="[value can be set during the attack]" />
+    <!-- do NOT change these parameter needed for PtT -->
+    <Setting Name="ticketsDir" Value="C:\temp\tickets" />
+    <Setting Name="ticketsPath" Value="c$\temp\tickets" />
     <!-- Parameter -->
-    <add key="time2reboot" value="15" />
-    <add key="OpenSSL" value="C:\Program Files\OpenSSL-Win64\start.bat" />
-    <add key="EnterpriseCA" value="xxx" />
+    <Setting Name="time2reboot" Value="30" />
+    <Setting Name="OpenSSL" Value="C:\Program Files\OpenSSL-Win64\start.bat" />
+    <Setting Name="EnterpriseCA" Value="ROOT-DC22-01.WS22-ROOT.CORP\WS22-ROOT-ROOT-DC22-01-CA" />
+    <Setting Name="BadCA" Value="AS2GoBadCert" />
     <!-- Spare part -->
-    <add key="SP01" value="PassWOrd!" />
-    <add key="SP02" value="xxx" />
-    <add key="SP03" value="xxx" />
-    <add key="SP04" value="xxx" />
+    <Setting Name="SP01" Value="xxx" />
+    <Setting Name="SP02" Value="xxx" />
+    <Setting Name="SP03" Value="xxx" />
+    <Setting Name="SP04" Value="xxx" />
+    <Setting Name="SP05" Value="xxx" />
+    <Setting Name="SP06" Value="xxx" />
+    <Setting Name="SP07" Value="xxx" />
+    <Setting Name="SP08" Value="xxx" />
     <!-- no need for modification -->
-    <add key="LastStart" value="2022-12-01 00:00:02" />
-    <add key="LastFinished" value="2022-12-01 00:13:20" />
-    <add key="LastDuration" value="00:13:18 [h]" />
-    <add key="LastVictim" value="VI-HerrHoZi" />
-    <add key="LastBDUser" value="BD-20221201.001126" />
-    <add key="LastStage" value="COMPLETE" />
+    <Setting Name="LastStart" Value="2023-04-13 19:50:25" />
+    <Setting Name="LastFinished" Value="2023-03-30 15:15:55" />
+    <Setting Name="LastDuration" Value="00:14:38 [h]" />
+    <Setting Name="LastVictim" Value="VI-HERRHOZI" />
+    <Setting Name="LastBDUser" Value="BD-20230412.104134" />
+    <Setting Name="LastStage" Value="Privilege Escalation" />
+    <Setting Name="LastPW" Value="xxxxxxxx" />
+    <Setting Name="LastNumofDemoUsers" Value="50" />
+    <Setting Name="LastIdentifier" Value="168128893223735" />
+    <Setting Name="LastGTUser" Value="FU-20230414.182600" />
+    <Setting Name="LastPriviledgeEscaltion" Value="AS2GoBadCert" />
   </DefaultParameter>
 </Config>
