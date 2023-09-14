@@ -138,7 +138,7 @@ Param (
 ################################################################################
 
 $lastupdate = "2023-09-10"
-$version = "2.9.6"
+$version = "2.9.0"
 # 2022-09-10 | v2.9.0 |  Upload to Github
 # 2023-09-09 | v2.8.6 |  minor updates
 # 2023-08-29 | v2.8.5 |  Update Function Get-KerberosTGT
