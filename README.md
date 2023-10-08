@@ -38,11 +38,37 @@ AS2Go.ps1
 
 
 ## What's New 
+
+### .... with v3.0:
+
+- add a new Domain Compromise & Persistence action
+  - Manipulating Group Policy Templates (GPT) files
+    - setting User Rights Assignment
+    - adding Domain Users to Local Admins
+    - adding a Schedule Task
+
+### .... with v2.9:
+
+- Update and Improve Function Get-VulnerableCertificateTemplate
+
+### .... with v2.8:
+- Attack Compatibility Matrix – 
+- New Privilege Escalation – Credential Theft through Memory Access
+- many  improvements, e.g. da-xxxx.pem file will be automatically created during Force Authentication Certificate attack
+- Update AS2Go.xml schema
+- Update Golden Ticket Attack
+
 ### .... with v2.6:
 
-Preview #1
-	• syntax highlighting
- 	• Kerberoasting attack
+- New Cyber Attacks Methods
+  - Steal or Forge Authentication Certificates
+  - Kerberoasting
+  - Password Spray
+- new color schema (syntax highlighting, especially for the commands)
+- many  improvements, e.g. added switch ‘| out-host’ to see the results from sub functions directy
+- Update setup scripts
+  - New-AS2GoUsers.ps1, creates a new set of AS2Go Users – see more details here
+  - New-AS2GoOUs.ps1, create the  AS2Go OU structure incl. Tiering Model – see more details here
 
 ![As2Go-Preview-01](https://user-images.githubusercontent.com/96825160/203348771-4aa6f28c-6136-419f-989c-a206ceac6d1f.gif)
 
